@@ -2,11 +2,11 @@
 // Phase 1 minimum: open a window, clear it each frame, quit on ESC.
 
 #include <glad/glad.h>
-#include <GLFW/glfw3.h>
 
 #include <string>
 
 #include "core/GLDebug.h"
+#include "core/Input.h"
 #include "core/Logger.h"
 #include "core/Timer.h"
 #include "core/Window.h"
@@ -16,6 +16,7 @@ int main() {
 
     Window window(WindowProps{"Jade Engine", 1280, 720});
     Timer  timer;
+    Input  input(window.native());
     JADE_LOG_INFO("Jade Engine initialized");
 
     // Variable-render / fixed-update loop. Simulation work goes inside the
@@ -23,9 +24,9 @@ int main() {
     while (!window.shouldClose()) {
         timer.tick();
         window.pollEvents();
+        input.update();
 
-        // TODO(jade): replace with Input module
-        if (glfwGetKey(window.native(), GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        if (input.isKeyDown(Key::Escape)) {
             window.requestClose();
         }
 
@@ -40,7 +41,9 @@ int main() {
         window.swapBuffers();
     }
 
-    // Prove the clock advanced during the run (useful for headless smoke tests).
+    const MousePosition mouse = input.mousePosition();
+    JADE_LOG_INFO(std::string("Input mouse=(") + std::to_string(mouse.x)
+                  + ", " + std::to_string(mouse.y) + ")");
     JADE_LOG_INFO(std::string("Timer totalTime=") + std::to_string(timer.totalTime())
                   + "s fixedDelta=" + std::to_string(timer.fixedDelta()) + "s");
     JADE_LOG_INFO("Jade Engine shutdown");

@@ -82,8 +82,8 @@ renderer skeleton. Exit when a colored mesh can be drawn under a fixed timestep.
 | GLDebug | `core/GLDebug.h` | DONE | `GL_CHECK` drains `glGetError` after every GL call |
 | Window | `core/Window.h/.cpp` | DONE | GLFW window, GL 4.6 core + forward-compat, debug context in non-NDEBUG, GLAD after context, hi-DPI viewport, resize callback via user-pointer, vsync on, RAII + GLFW refcount |
 | Timer | `core/Timer.h/.cpp` | DONE | Delta time + fixed-timestep accumulator. See module spec below. |
-| Input | `core/Input.h/.cpp` | NEXT | Replace inline `glfwGetKey` in `main.cpp`. Keyboard + mouse query API. |
-| Math types | `math/MathTypes.h` | OPEN | Thin glm aliases / engine typedefs used by renderer |
+| Input | `core/Input.h/.cpp` | DONE | Replace inline `glfwGetKey` in `main.cpp`. Keyboard + mouse query API. |
+| Math types | `math/MathTypes.h` | NEXT | Thin glm aliases / engine typedefs used by renderer |
 | Renderer | `renderer/Renderer.h/.cpp` | OPEN | Clear + draw orchestration |
 | Shader | `renderer/Shader.h/.cpp` | OPEN | Compile/link GLSL, uniform setters |
 | Mesh | `renderer/Mesh.h/.cpp` | OPEN | VAO/VBO/EBO wrapper |
@@ -107,14 +107,17 @@ log. Zero warnings.
   - No GLFW dependency. Pure chrono.
   - Wired into `main.cpp`. ESC remains inline until Input lands (`TODO(jade)`).
 
-#### Input module spec (build this next)
+#### Input module spec (DONE)
 
-- Poll or query keyboard/mouse through GLFW without scattering `glfwGetKey` in
+- Poll / query keyboard + mouse through GLFW without scattering `glfwGetKey` in
   `main.cpp`.
-- Window supplies the native `GLFWwindow*` (already exposed via `native()`).
-- Mark the ESC path in `main.cpp` with `TODO(jade): replace with Input module`.
+- `Input` takes the native `GLFWwindow*` from `Window::native()`.
+- `update()` after `pollEvents()`; `isKeyDown` / mouse button queries; edge
+  helpers (`wasKeyPressed`, etc.) for tracked keys; `mousePosition()`.
+- `Key::` / `Mouse::` constants so call sites need not include GLFW.
+- ESC path in `main.cpp` uses `input.isKeyDown(Key::Escape)`.
 
-#### Renderer module group (closes Phase 1)
+#### Renderer module group (build this next — closes Phase 1)
 
 - `MathTypes.h` first if the renderer needs vec/mat aliases.
 - Shader → Mesh → Texture → Renderer orchestration.
@@ -174,6 +177,6 @@ From `docs/VERIFICATION_2026-08-19.md`:
 **DONE.** CMake/vcpkg, Window, Logger, GLDebug, and the main loop with
 `"Jade Engine initialized"` are landed and verified.
 
-**Next Cursor instruction that stays on rails:** build `core/Input` per the
-module spec above, then stop. Do not start the renderer group in the same
-change unless the user explicitly asks.
+**Next Cursor instruction that stays on rails:** open `math/MathTypes.h`, then
+the `renderer/` group (Shader → Mesh → Texture → Renderer). Do not start Phase 2
+in the same change unless the user explicitly asks.

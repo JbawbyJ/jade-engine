@@ -20,8 +20,8 @@ after each meaningful checkpoint.
 | Window (GLFW + GL 4.6 core) | `core/Window.h/.cpp` | [x] Done |
 | Entry loop + ESC | `main.cpp` | [x] Done (Input still inline) |
 | Timer (delta + fixed accumulator) | `core/Timer.h/.cpp` | [x] Done |
-| Input | `core/Input.h/.cpp` | [ ] **Next** |
-| Math types | `math/MathTypes.h` | [ ] Open |
+| Input | `core/Input.h/.cpp` | [x] Done |
+| Math types | `math/MathTypes.h` | [ ] **Next** |
 | Renderer | `renderer/Renderer.h/.cpp` | [ ] Open |
 | Shader | `renderer/Shader.h/.cpp` | [ ] Open |
 | Mesh | `renderer/Mesh.h/.cpp` | [ ] Open |
@@ -33,8 +33,7 @@ zero-warning build.
 
 **Ordered next commits:**
 
-1. `core/Input` — replace ESC escape hatch (`TODO(jade)` already marked in `main.cpp`)
-2. `math/MathTypes.h` + `renderer/` group — closes Phase 1
+1. `math/MathTypes.h` + `renderer/` group — closes Phase 1
 
 ---
 
@@ -72,7 +71,7 @@ zero-warning build.
 | Milestone | Meaning |
 | --- | --- |
 | M0 First Task | Window + Logger + GL_CHECK + clear loop — **complete** |
-| M1 Timer + Input | Timer done; Input next |
+| M1 Timer + Input | **complete** |
 | M2 First triangle | Shader + Mesh + Renderer clear/draw |
 | M3 Phase 1 exit | All Phase 1 modules checked above |
 | M4+ | Open Phase 2+ sections in `.cursorrules` as they start |
