@@ -72,7 +72,7 @@ zero-warning build.
 | Milestone | Meaning |
 | --- | --- |
 | M0 First Task | Window + Logger + GL_CHECK + clear loop — **complete** |
-| M1 Timer + Input | Deterministic update step + queryable input |
+| M1 Timer + Input | Timer done; Input next |
 | M2 First triangle | Shader + Mesh + Renderer clear/draw |
 | M3 Phase 1 exit | All Phase 1 modules checked above |
 | M4+ | Open Phase 2+ sections in `.cursorrules` as they start |

@@ -27,6 +27,7 @@ find_package(glm   CONFIG REQUIRED)
 add_executable(jade
     main.cpp
     core/Logger.cpp
+    core/Timer.cpp
     core/Window.cpp
 )
 

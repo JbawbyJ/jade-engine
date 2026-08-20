@@ -4,24 +4,33 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <string>
+
 #include "core/GLDebug.h"
 #include "core/Logger.h"
+#include "core/Timer.h"
 #include "core/Window.h"
 
 int main() {
     using namespace jade;
 
     Window window(WindowProps{"Jade Engine", 1280, 720});
+    Timer  timer;
     JADE_LOG_INFO("Jade Engine initialized");
 
-    // The render/update loop. In Phase 1 there is no fixed timestep yet -
-    // Timer.h (next module) will introduce delta time and a step accumulator.
+    // Variable-render / fixed-update loop. Simulation work goes inside the
+    // consumeFixedStep drain; rendering stays outside and uses deltaTime().
     while (!window.shouldClose()) {
+        timer.tick();
         window.pollEvents();
 
-        // Phase 1 input is inline; Phase 1's Input module will replace this.
+        // TODO(jade): replace with Input module
         if (glfwGetKey(window.native(), GLFW_KEY_ESCAPE) == GLFW_PRESS) {
             window.requestClose();
+        }
+
+        while (timer.consumeFixedStep()) {
+            // Fixed-rate simulation hook. Empty until gameplay systems land.
         }
 
         // Clear color + depth so we don't accumulate previous frames.
@@ -31,6 +40,9 @@ int main() {
         window.swapBuffers();
     }
 
+    // Prove the clock advanced during the run (useful for headless smoke tests).
+    JADE_LOG_INFO(std::string("Timer totalTime=") + std::to_string(timer.totalTime())
+                  + "s fixedDelta=" + std::to_string(timer.fixedDelta()) + "s");
     JADE_LOG_INFO("Jade Engine shutdown");
     return 0;
 }
