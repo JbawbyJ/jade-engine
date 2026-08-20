@@ -1,0 +1,179 @@
+# Jade Engine — Cursor Rules
+
+Custom C++17 game engine inspired by Ubisoft's Jade. Built with CMake + vcpkg
+(glfw3, glad, glm). OpenGL 4.6 core profile. Phase-gated development — finish the
+current module before opening the next.
+
+This file is the durable plan. Prefer it over chat history. When in doubt, stay
+on the current Phase 1 checklist in `docs/ROADMAP.md`.
+
+---
+
+## Project identity
+
+- **Name:** Jade Engine
+- **Language:** C++17 (required, extensions OFF)
+- **Build:** CMake 3.20+, Ninja preferred
+- **Deps:** vcpkg manifest (`vcpkg.json`) — glfw3, glad, glm
+- **Binary:** `jade` → `${CMAKE_BINARY_DIR}/bin/jade`
+- **Include root:** project root (`#include "core/Window.h"`)
+
+---
+
+## Coding standards (non-negotiable)
+
+1. `#pragma once` in every header. No include guards.
+2. Everything engine-owned lives in `namespace jade`.
+3. Naming: PascalCase classes / structs, camelCase methods and variables,
+   `m_` prefix for members, `s_` for file-static / class-static state,
+   `k` prefix for constexpr constants (`kFixedDelta`).
+4. No raw `new` / `delete`. Own OS/C handles with RAII (constructor acquires,
+   destructor releases, copies deleted). Smart pointers only when ownership is
+   shared or transferred.
+5. Never `using namespace std;` in headers or `.cpp` files. Qualify (`std::string`)
+   or use narrow using-declarations inside function scope if truly needed.
+6. Logging: `JADE_LOG_INFO` / `JADE_LOG_WARN` / `JADE_LOG_ERROR` only.
+   Never bare `std::cout` / `printf` for engine diagnostics.
+7. Invariants: `JADE_ASSERT(cond, msg)` — logs then `std::abort()`. Use for
+   "this must never happen" (init failures, null handles). Recoverable errors
+   use `JADE_LOG_ERROR` and a graceful path.
+8. Every OpenGL call wraps in `GL_CHECK(...)` from day one (`core/GLDebug.h`).
+9. New `.cpp` files are added to `CMakeLists.txt` in the same commit.
+10. Platform differences go behind `#if defined(_WIN32)` / `#else` (see Logger).
+11. Comments may use short web-dev analogies when they clarify intent
+    (e.g. resize callback ≈ JS event emitter). Keep them tight.
+12. Open work uses the exact tag format: `// TODO(jade): <what remains>`.
+    Grep for `TODO(jade)` to find stubs.
+13. Strict warnings from day one: MSVC `/W4 /permissive-`, elsewhere
+    `-Wall -Wextra -Wpedantic`. Zero-warning builds only.
+14. Headers stay lean: forward-declare where possible (see `GLFWwindow` in
+    `Window.h`). Implementation details stay in `.cpp`.
+
+---
+
+## Cursor behavior rules
+
+- One module at a time. Do not start `Input` while finishing `Timer`.
+- Match existing style: RAII wrappers, macro loggers, `GL_CHECK`, namespace
+  `jade`, comment density of `Window.cpp` / `Logger.cpp`.
+- Prefer small, reviewable commits. Update `docs/ROADMAP.md` checkboxes when a
+  module lands. Add a dated `docs/VERIFICATION_YYYY-MM-DD.md` after meaningful
+  Phase checkpoints.
+- Do not invent Phase 2+ APIs early. Phase 1 comments that say "Phase 2 will…"
+  are intentional sequencing, not invitations to scope-creep.
+- Do not weaken warnings, remove `GL_CHECK`, or bypass `JADE_ASSERT`.
+- Headless / CI runs need a virtual display + Mesa software GL — see
+  `AGENTS.md` (Cloud) or run under `xvfb-run` with
+  `MESA_GL_VERSION_OVERRIDE=4.6` because the engine requests a 4.6 core context.
+
+---
+
+## Phase plan (7 phases)
+
+### Phase 1 — Foundation (CURRENT)
+
+Goal: open a window, tick time, read input, clear a framebuffer with a real
+renderer skeleton. Exit when a colored mesh can be drawn under a fixed timestep.
+
+| Module | Path | Status | Spec |
+| --- | --- | --- | --- |
+| Build wiring | `CMakeLists.txt`, `vcpkg.json` | DONE | C++17, vcpkg toolchain auto-pickup, find_package glfw3/glad/glm, strict warnings |
+| Logger | `core/Logger.h/.cpp` | DONE | Thread-safe, ms timestamps, INFO/WARN/ERROR, `__FILE__:__LINE__`, errors → stderr |
+| GLDebug | `core/GLDebug.h` | DONE | `GL_CHECK` drains `glGetError` after every GL call |
+| Window | `core/Window.h/.cpp` | DONE | GLFW window, GL 4.6 core + forward-compat, debug context in non-NDEBUG, GLAD after context, hi-DPI viewport, resize callback via user-pointer, vsync on, RAII + GLFW refcount |
+| Timer | `core/Timer.h/.cpp` | DONE | Delta time + fixed-timestep accumulator. See module spec below. |
+| Input | `core/Input.h/.cpp` | NEXT | Replace inline `glfwGetKey` in `main.cpp`. Keyboard + mouse query API. |
+| Math types | `math/MathTypes.h` | OPEN | Thin glm aliases / engine typedefs used by renderer |
+| Renderer | `renderer/Renderer.h/.cpp` | OPEN | Clear + draw orchestration |
+| Shader | `renderer/Shader.h/.cpp` | OPEN | Compile/link GLSL, uniform setters |
+| Mesh | `renderer/Mesh.h/.cpp` | OPEN | VAO/VBO/EBO wrapper |
+| Texture | `renderer/Texture.h/.cpp` | OPEN | 2D texture upload / bind |
+
+**Phase 1 exit criteria:** window + logger + timer (fixed step) + input module +
+a renderer that draws at least one mesh with a shader. ESC quits. Clean shutdown
+log. Zero warnings.
+
+#### Timer module spec (DONE)
+
+- Header: `core/Timer.h`. Implementation: `core/Timer.cpp`.
+- `namespace jade`. Class `Timer`.
+- Responsibilities:
+  - Measure frame delta time in seconds (float), using `std::chrono::steady_clock`.
+  - Clamp spikes (e.g. max ~0.25s) so a hitch does not blow the accumulator
+    ("spiral of death" guard — same idea as capping `dt` in a JS `requestAnimationFrame` loop).
+  - Maintain a fixed-timestep accumulator. Default fixed step: `1/60` second
+    (`kFixedDelta`).
+  - API: `tick()`, `deltaTime()`, `fixedDelta()`, `consumeFixedStep()`, `totalTime()`.
+  - No GLFW dependency. Pure chrono.
+  - Wired into `main.cpp`. ESC remains inline until Input lands (`TODO(jade)`).
+
+#### Input module spec (build this next)
+
+- Poll or query keyboard/mouse through GLFW without scattering `glfwGetKey` in
+  `main.cpp`.
+- Window supplies the native `GLFWwindow*` (already exposed via `native()`).
+- Mark the ESC path in `main.cpp` with `TODO(jade): replace with Input module`.
+
+#### Renderer module group (closes Phase 1)
+
+- `MathTypes.h` first if the renderer needs vec/mat aliases.
+- Shader → Mesh → Texture → Renderer orchestration.
+- Still wrap every GL call in `GL_CHECK`.
+
+### Phase 2 — Debug + richer GL
+
+- Replace poll-based `GL_CHECK` with `glDebugMessageCallback` (KHR_debug) where
+  available; keep `GL_CHECK` as a fallback.
+- Expand logging sinks if needed (file / in-engine console).
+- Camera / view-projection helpers.
+
+### Phase 3 — Scene / transforms
+
+- Entity or node transform hierarchy.
+- Basic scene graph or flat entity list — pick one style and stay consistent.
+
+### Phase 4 — Assets
+
+- Mesh/texture/shader loading from disk.
+- Hot-reload optional; do not block Phase 4 on it.
+
+### Phase 5 — Gameplay loop
+
+- Systems that consume the fixed timestep (physics-lite, controllers).
+- Keep render on the variable frame; simulate on the fixed step.
+
+### Phase 6 — Tooling / editor hooks
+
+- Multi-window support (Window already refcounts GLFW for this).
+- Debug draw / gizmos.
+
+### Phase 7 — Polish + packaging
+
+- Release build config, asset packaging, README for end users.
+- Performance passes only with a profiler, not guesswork.
+
+Phases 2–7 are intentionally thinner than Phase 1. Expand a phase's section in
+this file when that phase becomes current — do not invent APIs ahead of time.
+
+---
+
+## Known nits (carry forward)
+
+From `docs/VERIFICATION_2026-08-19.md`:
+
+1. `s_glfwRefCount` is not atomic — fine until threading; make it `std::atomic`
+   when a second thread touches GLFW lifecycle.
+2. `Window::requestClose() const` mutates GLFW state behind a const method —
+   style nit; clean up when touching Window next.
+3. Prefer `// TODO(jade):` tags on temporary stubs so open work is greppable.
+
+---
+
+## First Task status
+
+**DONE.** CMake/vcpkg, Window, Logger, GLDebug, and the main loop with
+`"Jade Engine initialized"` are landed and verified.
+
+**Next Cursor instruction that stays on rails:** build `core/Input` per the
+module spec above, then stop. Do not start the renderer group in the same
+change unless the user explicitly asks.
