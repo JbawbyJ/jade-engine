@@ -1,9 +1,11 @@
 # Jade Engine Roadmap
 
-Phase tracker for the custom C++17 / OpenGL 4.6 engine. Companion docs:
+Phase tracker for the custom C++17 / OpenGL engine (4.6 core preferred,
+3.3 core minimum). Companion docs:
 
 - [`.cursorrules`](../.cursorrules) — full plan, coding standards, Cursor behavior
 - [`VERIFICATION_2026-08-19.md`](./VERIFICATION_2026-08-19.md) — Phase 1 foundation audit
+- [`VERIFICATION_2026-08-22.md`](./VERIFICATION_2026-08-22.md) — Phase 1 review-findings hygiene
 
 Update checkboxes when a module lands. Add a new `VERIFICATION_YYYY-MM-DD.md`
 after each meaningful checkpoint.
@@ -17,7 +19,7 @@ after each meaningful checkpoint.
 | Build wiring (C++17, vcpkg, warnings) | `CMakeLists.txt`, `vcpkg.json` | [x] Done |
 | Logger | `core/Logger.h/.cpp` | [x] Done |
 | GL_CHECK helper | `core/GLDebug.h` | [x] Done |
-| Window (GLFW + GL 4.6 core) | `core/Window.h/.cpp` | [x] Done |
+| Window (GLFW + GL 4.6→3.3 fallback) | `core/Window.h/.cpp` | [x] Done |
 | Entry loop + ESC | `main.cpp` | [x] Done (Input still inline) |
 | Timer (delta + fixed accumulator) | `core/Timer.h/.cpp` | [x] Done |
 | Input | `core/Input.h/.cpp` | [x] Done |

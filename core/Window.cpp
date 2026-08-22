@@ -5,6 +5,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <mutex>
 #include <string>
 
 #include "core/GLDebug.h"
@@ -15,61 +16,131 @@ namespace jade {
 namespace {
     // Reference-counted GLFW init. We support multiple Window instances even
     // though Phase 1 only creates one, because tools/editors will need it.
-    int s_glfwRefCount = 0;
+    // The mutex guards the count so a second thread cannot interleave
+    // init/terminate; increment happens only after glfwInit succeeds.
+    std::mutex s_glfwMutex;
+    int        s_glfwRefCount = 0;
+
+    constexpr int kContextFallbacks[][2] = {
+        {4, 6},
+        {4, 5},
+        {4, 3},
+        {3, 3},
+    };
 
     void glfwErrorCallback(int code, const char* description) {
         JADE_LOG_ERROR(std::string("GLFW error ") + std::to_string(code) + ": " + description);
+    }
+
+    const char* glStringOrUnknown(GLenum name) {
+        const GLubyte* value = nullptr;
+        GL_CHECK(value = glGetString(name));
+        if (value == nullptr) {
+            return "unknown";
+        }
+        return reinterpret_cast<const char*>(value);
+    }
+
+    GLFWwindow* createWindowWithFallback(int width, int height, const char* title) {
+        const int last = static_cast<int>(sizeof(kContextFallbacks) / sizeof(kContextFallbacks[0])) - 1;
+        for (int i = 0; i <= last; ++i) {
+            const int major = kContextFallbacks[i][0];
+            const int minor = kContextFallbacks[i][1];
+
+            glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, major);
+            glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, minor);
+            glfwWindowHint(GLFW_OPENGL_PROFILE,        GLFW_OPENGL_CORE_PROFILE);
+            glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+#if !defined(NDEBUG)
+            // Debug contexts emit verbose driver diagnostics; only enable in dev builds.
+            glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+#endif
+
+            GLFWwindow* window = glfwCreateWindow(width, height, title, nullptr, nullptr);
+            if (window != nullptr) {
+                JADE_LOG_INFO(std::string("Negotiated OpenGL ")
+                              + std::to_string(major) + "." + std::to_string(minor)
+                              + " core context");
+                return window;
+            }
+
+            JADE_LOG_WARN(std::string("OpenGL ")
+                          + std::to_string(major) + "." + std::to_string(minor)
+                          + (i == last ? " core unavailable"
+                                       : " core unavailable, trying older..."));
+        }
+        return nullptr;
+    }
+}
+
+void Window::acquireGlfw() {
+    std::lock_guard<std::mutex> lock(s_glfwMutex);
+    if (s_glfwRefCount == 0) {
+        glfwSetErrorCallback(glfwErrorCallback);
+        if (glfwInit() != GLFW_TRUE) {
+            throw WindowError("glfwInit failed");
+        }
+    }
+    ++s_glfwRefCount;
+    m_glfwHeld = true;
+}
+
+void Window::releaseGlfw() {
+    if (!m_glfwHeld) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(s_glfwMutex);
+    m_glfwHeld = false;
+    if (s_glfwRefCount > 0 && --s_glfwRefCount == 0) {
+        glfwTerminate();
     }
 }
 
 Window::Window(const WindowProps& props)
     : m_width(props.width), m_height(props.height) {
+    try {
+        acquireGlfw();
 
-    // Initialize GLFW once, regardless of how many Windows exist.
-    if (s_glfwRefCount++ == 0) {
-        glfwSetErrorCallback(glfwErrorCallback);
-        JADE_ASSERT(glfwInit() == GLFW_TRUE, "glfwInit failed");
+        // Prefer 4.6 core, then walk down to the documented 3.3 minimum.
+        m_window = createWindowWithFallback(m_width, m_height, props.title.c_str());
+        if (m_window == nullptr) {
+            throw WindowError(
+                "Failed to create a window: no OpenGL 3.3+ core context is available");
+        }
+
+        // A GL context is bound to a thread, not a process. Make it current here.
+        glfwMakeContextCurrent(m_window);
+        glfwSwapInterval(1); // vsync on; flip to 0 later when profiling
+
+        // Stash `this` on the GLFWwindow so static C callbacks can recover the
+        // owning Window* without a global. This is GLFW's idiomatic pattern.
+        glfwSetWindowUserPointer(m_window, this);
+        glfwSetFramebufferSizeCallback(m_window, &Window::framebufferSizeCallback);
+        glfwSetWindowSizeCallback(m_window, &Window::windowSizeCallback);
+
+        // Load OpenGL function pointers via GLAD. This must happen AFTER we have
+        // a current context - before this call, every gl* function is nullptr.
+        if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
+            throw WindowError("Failed to load OpenGL via GLAD");
+        }
+
+        JADE_LOG_INFO(std::string("OpenGL ")
+                      + glStringOrUnknown(GL_VERSION)
+                      + " | GPU: "
+                      + glStringOrUnknown(GL_RENDERER));
+
+        // Hi-DPI (e.g. Retina) decouples window size from framebuffer size.
+        glfwGetWindowSize(m_window, &m_width, &m_height);
+        glfwGetFramebufferSize(m_window, &m_framebufferWidth, &m_framebufferHeight);
+        GL_CHECK(glViewport(0, 0, m_framebufferWidth, m_framebufferHeight));
+    } catch (...) {
+        if (m_window != nullptr) {
+            glfwDestroyWindow(m_window);
+            m_window = nullptr;
+        }
+        releaseGlfw();
+        throw;
     }
-
-    // Request an OpenGL 4.6 core profile context. "Core" means deprecated
-    // fixed-function APIs are unavailable - only the modern programmable
-    // pipeline. Forward-compat removes anything marked deprecated in 4.6.
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-    glfwWindowHint(GLFW_OPENGL_PROFILE,        GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
-#if !defined(NDEBUG)
-    // Debug contexts emit verbose driver diagnostics; only enable in dev builds.
-    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
-#endif
-
-    m_window = glfwCreateWindow(m_width, m_height, props.title.c_str(), nullptr, nullptr);
-    JADE_ASSERT(m_window != nullptr, "glfwCreateWindow failed");
-
-    // A GL context is bound to a thread, not a process. Make it current here.
-    glfwMakeContextCurrent(m_window);
-    glfwSwapInterval(1); // vsync on; flip to 0 later when profiling
-
-    // Stash `this` on the GLFWwindow so static C callbacks can recover the
-    // owning Window* without a global. This is GLFW's idiomatic pattern.
-    glfwSetWindowUserPointer(m_window, this);
-    glfwSetFramebufferSizeCallback(m_window, &Window::framebufferSizeCallback);
-
-    // Load OpenGL function pointers via GLAD. This must happen AFTER we have
-    // a current context - before this call, every gl* function is nullptr.
-    JADE_ASSERT(gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)),
-                "Failed to load OpenGL via GLAD");
-
-    JADE_LOG_INFO(std::string("OpenGL ")
-                  + reinterpret_cast<const char*>(glGetString(GL_VERSION))
-                  + " | GPU: "
-                  + reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
-
-    // Hi-DPI (e.g. Retina) decouples window size from framebuffer size. Always
-    // set the viewport from the framebuffer size, never from the window size.
-    int fbW = 0, fbH = 0;
-    glfwGetFramebufferSize(m_window, &fbW, &fbH);
-    GL_CHECK(glViewport(0, 0, fbW, fbH));
 }
 
 Window::~Window() {
@@ -77,9 +148,7 @@ Window::~Window() {
         glfwDestroyWindow(m_window);
         m_window = nullptr;
     }
-    if (--s_glfwRefCount == 0) {
-        glfwTerminate();
-    }
+    releaseGlfw();
 }
 
 void Window::pollEvents() const {
@@ -96,7 +165,7 @@ bool Window::shouldClose() const {
     return glfwWindowShouldClose(m_window) == GLFW_TRUE;
 }
 
-void Window::requestClose() const {
+void Window::requestClose() {
     glfwSetWindowShouldClose(m_window, GLFW_TRUE);
 }
 
@@ -105,10 +174,21 @@ void Window::framebufferSizeCallback(GLFWwindow* window, int width, int height) 
     auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
     if (!self) return;
 
-    self->m_width  = width;
-    self->m_height = height;
+    self->m_framebufferWidth  = width;
+    self->m_framebufferHeight = height;
+
+    // Multi-window: this callback can fire while another context is current.
+    glfwMakeContextCurrent(window);
     GL_CHECK(glViewport(0, 0, width, height));
     if (self->m_onResize) self->m_onResize(width, height);
+}
+
+void Window::windowSizeCallback(GLFWwindow* window, int width, int height) {
+    auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
+    if (!self) return;
+
+    self->m_width  = width;
+    self->m_height = height;
 }
 
 } // namespace jade

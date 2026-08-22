@@ -38,8 +38,9 @@ private:
 #define JADE_LOG_WARN(msg)  ::jade::Logger::log(::jade::LogLevel::Warn,  __FILE__, __LINE__, (msg))
 #define JADE_LOG_ERROR(msg) ::jade::Logger::log(::jade::LogLevel::Error, __FILE__, __LINE__, (msg))
 
-// Hard invariant: log + abort if `cond` is false. Use only for "this must
-// never happen" conditions, not recoverable errors (those use JADE_LOG_ERROR).
+// Hard invariant: log + abort if `cond` is false. Use only for programmer
+// invariants that must never happen (e.g. a null handle the caller promised).
+// Recoverable init failures throw (see WindowError) or use JADE_LOG_ERROR.
 #define JADE_ASSERT(cond, msg)                                                \
     do {                                                                      \
         if (!(cond)) {                                                        \

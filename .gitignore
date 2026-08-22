@@ -1,5 +1,7 @@
 build/
 out/
+.vcpkg/
+.vcpkg-cache/
 .vs/
 .vscode/
 .cache/

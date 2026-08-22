@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: smoke (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu
+            os: ubuntu-latest
+          - name: windows
+            os: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Ubuntu packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build \
+            pkg-config \
+            python3 \
+            autoconf \
+            autoconf-archive \
+            automake \
+            libtool \
+            libgl1-mesa-dev \
+            libx11-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxi-dev
+
+      - name: Cache vcpkg binary packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.vcpkg-cache
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'overlays/glad/portfile.cmake') }}
+
+      - name: Clone vcpkg
+        run: git clone --depth 1 https://github.com/microsoft/vcpkg.git ${{ github.workspace }}/.vcpkg
+
+      - name: Bootstrap vcpkg
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            "${GITHUB_WORKSPACE}/.vcpkg/bootstrap-vcpkg.bat" -disableMetrics
+          else
+            "${GITHUB_WORKSPACE}/.vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+
+      - name: Configure
+        shell: bash
+        env:
+          VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache
+        run: |
+          mkdir -p "${VCPKG_DEFAULT_BINARY_CACHE}"
+          cmake_args=(
+            -S .
+            -B build
+            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_TOOLCHAIN_FILE="${GITHUB_WORKSPACE}/.vcpkg/scripts/buildsystems/vcpkg.cmake"
+            -DVCPKG_OVERLAY_PORTS="${GITHUB_WORKSPACE}/overlays"
+          )
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            cmake_args+=(-G Ninja)
+          fi
+          cmake "${cmake_args[@]}"
+
+      - name: Build
+        run: cmake --build build --config Release
