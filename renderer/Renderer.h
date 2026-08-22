@@ -30,6 +30,10 @@ public:
     // clip-space shaders keep working unchanged.
     void setViewProjection(const Mat4& viewProjection);
 
+    // Unit vector from the surface toward the light, uploaded as `uLightDir`
+    // for the Lambert term. Normalized on set; a zero vector is ignored.
+    void setLightDirection(const Vec3& direction);
+
     void beginFrame() const;
     void draw(const Mesh& mesh, const Shader& shader) const;
     void draw(const Mesh& mesh, const Shader& shader, const Texture& texture) const;
@@ -41,6 +45,7 @@ public:
 private:
     Vec4 m_clearColor{0.10f, 0.10f, 0.12f, 1.0f};
     Mat4 m_viewProjection{1.0f};
+    Vec3 m_lightDirection{0.35f, 0.80f, 0.49f}; // normalized in the ctor
 };
 
 } // namespace jade

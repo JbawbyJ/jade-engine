@@ -26,16 +26,21 @@ namespace {
 constexpr const char* kTriangleVertexSrc = R"(
 #version 330 core
 layout (location = 0) in vec3 aPosition;
-layout (location = 1) in vec3 aColor;
-layout (location = 2) in vec2 aTexCoord;
+layout (location = 1) in vec3 aNormal;
+layout (location = 2) in vec3 aColor;
+layout (location = 3) in vec2 aTexCoord;
 
 uniform mat4 uViewProj;
 uniform mat4 uModel;
 
+out vec3 vNormal;
 out vec3 vColor;
 out vec2 vTexCoord;
 
 void main() {
+    // Normal matrix keeps normals perpendicular under non-uniform scale.
+    // TODO(jade): hoist to a uniform when per-vertex inverse() shows up in a profile.
+    vNormal = mat3(transpose(inverse(uModel))) * aNormal;
     vColor = aColor;
     vTexCoord = aTexCoord;
     gl_Position = uViewProj * uModel * vec4(aPosition, 1.0);
@@ -44,15 +49,20 @@ void main() {
 
 constexpr const char* kTriangleFragmentSrc = R"(
 #version 330 core
+in vec3 vNormal;
 in vec3 vColor;
 in vec2 vTexCoord;
 
 uniform sampler2D uTexture;
+uniform vec3 uLightDir; // unit vector from the surface toward the light
 
 out vec4 FragColor;
 
 void main() {
-    FragColor = vec4(vColor, 1.0) * texture(uTexture, vTexCoord);
+    // Lambert over an ambient floor: unlit faces stay readable, lit faces pop.
+    float ndotl = max(dot(normalize(vNormal), normalize(uLightDir)), 0.0);
+    float lit = 0.15 + 0.85 * ndotl;
+    FragColor = vec4(vColor * lit, 1.0) * texture(uTexture, vTexCoord);
 }
 )";
 
@@ -76,9 +86,9 @@ int main() {
         Shader shader(kTriangleVertexSrc, kTriangleFragmentSrc);
 
         const Vertex vertices[] = {
-            {{ 0.0f,  0.55f, 0.0f}, {1.0f, 0.25f, 0.20f}, {0.5f, 1.0f}},
-            {{-0.55f, -0.55f, 0.0f}, {0.20f, 0.85f, 0.30f}, {0.0f, 0.0f}},
-            {{ 0.55f, -0.55f, 0.0f}, {0.20f, 0.40f, 1.00f}, {1.0f, 0.0f}},
+            {{ 0.0f,  0.55f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.25f, 0.20f}, {0.5f, 1.0f}},
+            {{-0.55f, -0.55f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.20f, 0.85f, 0.30f}, {0.0f, 0.0f}},
+            {{ 0.55f, -0.55f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.20f, 0.40f, 1.00f}, {1.0f, 0.0f}},
         };
         const std::uint32_t indices[] = {0, 1, 2};
         Mesh triangle(vertices, 3, indices, 3);

@@ -161,7 +161,7 @@ Decisions: KHR_debug is push-based and replaces poll-only `GL_CHECK` on 4.3+
 contexts (llvmpipe's 4.5 in CI exercises it); pitch clamping is the Phase 5
 controller's job — Camera stores what it is given.
 
-### Phase 3 — Scene / transforms (CURRENT)
+### Phase 3 — Scene / transforms (DONE)
 
 **Decision: flat entity list, no hierarchy.** The demo end state (camera over
 a handful of meshes) never needs parenting; `Transform::matrix()` keeps the
@@ -191,10 +191,50 @@ Frozen interfaces:
 - `tests/TransformTests.cpp`: identity, pure translate, TRS ordering (a known
   point through a known transform), scale, rotation order sanity.
 
-### Phase 4 — Assets
+### Phase 4 — Assets (CURRENT)
 
-- Mesh/texture/shader loading from disk.
-- Hot-reload optional; do not block Phase 4 on it.
+Decisions: images via **stb** (vcpkg port `stb`), meshes via **tinyobjloader**
+(OBJ only — enough for demo props), shaders as plain text files. Loaders throw
+`AssetError`; ownership transfers via `std::unique_ptr` (the GL types are
+non-movable; rule 4 allows smart pointers for ownership transfer). Hot reload
+explicitly skipped per the original plan.
+
+Prerequisite (serialized, lands first): `Vertex` gains a normal — layout
+0=position, 1=normal, 2=color, 3=texCoord; `Mesh` attribute setup updated;
+demo shader gains a Lambert term (`uLightDir` = unit vector from surface
+toward the light, wrapped `max(dot(n,l),0)` over a 0.15 ambient floor;
+normals transformed by `mat3(transpose(inverse(uModel)))`);
+`Renderer::setLightDirection(const Vec3&)` cached and uploaded per draw.
+
+Frozen interfaces:
+
+- `assets/AssetError.h`: `class AssetError : public std::runtime_error`
+  (pattern of `WindowError`); `main` adds it to the specific catch list.
+- `assets/AssetPaths.h/.cpp`: `std::filesystem::path assetRoot();` —
+  `JADE_ASSET_ROOT` env override wins; else `assets/` next to the executable
+  (platform query behind `#if defined(_WIN32)` etc.; falls back to the
+  working directory with a logged WARN if the query fails). Resolved once,
+  logged once.
+- `assets/TextureLoader.h/.cpp`:
+  `std::unique_ptr<Texture> loadTexture(const std::filesystem::path& relative);`
+  — stb_image, vertical flip on, force 4 channels, `AssetError` with the full
+  path on failure. Exactly one TU defines `STB_IMAGE_IMPLEMENTATION`.
+- `assets/MeshLoader.h/.cpp`:
+  `std::unique_ptr<Mesh> loadMeshObj(const std::filesystem::path& relative);`
+  — tinyobjloader, triangulate on, de-index into
+  `Vertex{pos, normal, color=white, uv}`, flat normals generated when the OBJ
+  has none, `AssetError` on parse failure.
+- `assets/ShaderLoader.h/.cpp`:
+  `std::unique_ptr<Shader> loadShader(const std::filesystem::path& vertRel,
+  const std::filesystem::path& fragRel);` — read files to strings (missing
+  file → `AssetError`), delegate to the existing from-memory `Shader` ctor so
+  `ShaderError` semantics stay untouched.
+- Content: `assets/shaders/basic.vert/.frag` (the embedded demo GLSL moves out
+  of `main.cpp`), `assets/textures/checker.png` (small, committed),
+  `assets/meshes/cube.obj` + `plane.obj` (hand-authored, text-reviewable).
+- CMake: post-build `copy_directory` assets → `$<TARGET_FILE_DIR:jade>/assets`;
+  manifest gains `stb` + `tinyobjloader` (the one planned CI cache
+  invalidation); the local dev loop resolves both from system packages.
 
 ### Phase 5 — Gameplay loop
 

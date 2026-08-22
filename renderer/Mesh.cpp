@@ -43,11 +43,14 @@ Mesh::Mesh(const Vertex* vertices, std::size_t vertexCount,
                                    reinterpret_cast<const void*>(offsetof(Vertex, position))));
     GL_CHECK(glEnableVertexAttribArray(0));
     GL_CHECK(glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride,
-                                   reinterpret_cast<const void*>(offsetof(Vertex, color))));
+                                   reinterpret_cast<const void*>(offsetof(Vertex, normal))));
     GL_CHECK(glEnableVertexAttribArray(1));
-    GL_CHECK(glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride,
-                                   reinterpret_cast<const void*>(offsetof(Vertex, texCoord))));
+    GL_CHECK(glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride,
+                                   reinterpret_cast<const void*>(offsetof(Vertex, color))));
     GL_CHECK(glEnableVertexAttribArray(2));
+    GL_CHECK(glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, stride,
+                                   reinterpret_cast<const void*>(offsetof(Vertex, texCoord))));
+    GL_CHECK(glEnableVertexAttribArray(3));
 
     GL_CHECK(glBindVertexArray(0));
     GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, 0));

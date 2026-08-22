@@ -1,8 +1,8 @@
 #pragma once
 
 // VAO / VBO / EBO wrapper for a static indexed mesh.
-// Vertex layout is fixed for Phase 1: position + color + UV
-// (locations 0 / 1 / 2). Disk loaders land in Phase 4.
+// Vertex layout: position + normal + color + UV (locations 0 / 1 / 2 / 3).
+// Normals landed with Phase 4 so disk-loaded meshes can be Lambert-lit.
 
 #include <cstddef>
 #include <cstdint>
@@ -13,6 +13,7 @@ namespace jade {
 
 struct Vertex {
     Vec3 position{0.0f, 0.0f, 0.0f};
+    Vec3 normal{0.0f, 0.0f, 1.0f}; // default faces +Z, like a screen-aligned quad
     Vec3 color{1.0f, 1.0f, 1.0f};
     Vec2 texCoord{0.0f, 0.0f};
 };
