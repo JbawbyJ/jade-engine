@@ -125,12 +125,38 @@ log. Zero warnings.
 - Demo path embeds `#version 330 core` GLSL in `main.cpp` (no asset files).
 - Every GL call wraps in `GL_CHECK`. Shader compile/link throws `ShaderError`.
 
-### Phase 2 — Debug + richer GL
+### Phase 2 — Debug + richer GL (CURRENT)
 
-- Replace poll-based `GL_CHECK` with `glDebugMessageCallback` (KHR_debug) where
-  available; keep `GL_CHECK` as a fallback.
-- Expand logging sinks if needed (file / in-engine console).
-- Camera / view-projection helpers.
+Frozen interfaces — implement exactly these; flag concerns, don't improvise:
+
+- `core/GLDebug.h` + new `core/GLDebug.cpp`: `bool installGlDebugCallback();`
+  in `namespace jade`. When the context is 4.3+ or exposes `GLAD_GL_KHR_debug`:
+  enable `GL_DEBUG_OUTPUT` + `GL_DEBUG_OUTPUT_SYNCHRONOUS`, register a callback
+  mapping severity HIGH → `JADE_LOG_ERROR`, MEDIUM/LOW → `JADE_LOG_WARN`,
+  dropping NOTIFICATION spam; return whether installed. `GL_CHECK` stays as the
+  3.3-path fallback. Wired in `Window`'s constructor right after glad loads,
+  logging which mode is active. Callback bodies get exception barriers (same
+  rule as the resize callback).
+- New `renderer/Camera.h/.cpp`: pure math, no Input, no GL (glm headers in the
+  `.cpp` only, `math/MathTypes.h` in the header). Yaw/pitch in radians around
+  a Y-up world; yaw 0 / pitch 0 faces −Z, positive yaw turns toward +X:
+  `forward = {cos(pitch)·sin(yaw), sin(pitch), −cos(pitch)·cos(yaw)}`.
+  API: `view()`, `projection()`, `viewProjection()` (Mat4), `forward()` (Vec3),
+  `position()`/`setPosition(Vec3)`, `yaw()`/`setYaw(float)`,
+  `pitch()`/`setPitch(float)`, `setAspect(float)`,
+  `setPerspective(float fovYRadians, float nearPlane, float farPlane)`.
+  Defaults: position {0,0,2}, yaw/pitch 0, fovY 60°, aspect 16:9, near 0.1,
+  far 100 (`k`-prefixed constants). Unit tests in `tests/CameraTests.cpp`.
+- `Renderer::setViewProjection(const Mat4&)` cached on the Renderer; `draw()`
+  uploads it as `uViewProj`. Wired by the coordinator with the demo shader.
+- `core/Logger.h/.cpp`: `Logger::setFileSink(const std::string& path)` —
+  mirror every record into one `std::ofstream` guarded by the existing mutex;
+  empty path closes the sink; open failure logs an error and leaves the sink
+  closed. Stretch — may slip to Phase 6 without blocking Phase 2 exit.
+
+Decisions: KHR_debug is push-based and replaces poll-only `GL_CHECK` on 4.3+
+contexts (llvmpipe's 4.5 in CI exercises it); pitch clamping is the Phase 5
+controller's job — Camera stores what it is given.
 
 ### Phase 3 — Scene / transforms
 
