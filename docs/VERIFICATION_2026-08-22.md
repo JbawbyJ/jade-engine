@@ -20,6 +20,12 @@
 
 ---
 
+## Local verify (Cloud VM, 2026-08-22)
+
+- `cmake --build build` with `-Wall -Wextra -Wpedantic`: zero warnings.
+- Overlay glad header: `Profile: core`, `--api="gl=4.6"`.
+- Headless `xvfb-run` without `MESA_GL_VERSION_OVERRIDE`: 4.6 failed (`GLXBadFBConfig`), then **Negotiated OpenGL 4.5 core**, logged `OpenGL 4.5 (Core Profile) Mesa ... | GPU: llvmpipe`, then `Jade Engine initialized`.
+
 ## What was not done
 
 - No `math/MathTypes.h` or `renderer/` modules (intentionally still next).
