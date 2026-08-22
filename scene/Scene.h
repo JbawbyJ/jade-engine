@@ -34,6 +34,11 @@ public:
     std::vector<Entity>& entities();
     const std::vector<Entity>& entities() const;
 
+    // Copy every entity's current transform into previousTransform. Call once
+    // per render frame, before draining fixed steps, so interpolation always
+    // blends between the two most recent simulation states.
+    void snapshotPrevious();
+
     // TODO(jade): removal + generation ids when gameplay needs them.
 
 private:

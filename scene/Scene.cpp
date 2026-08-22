@@ -20,4 +20,10 @@ const std::vector<Entity>& Scene::entities() const {
     return m_entities;
 }
 
+void Scene::snapshotPrevious() {
+    for (Entity& entity : m_entities) {
+        entity.previousTransform = entity.transform;
+    }
+}
+
 } // namespace jade

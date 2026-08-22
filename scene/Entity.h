@@ -23,6 +23,10 @@ class Texture;
 struct Entity {
     std::string    name;
     Transform      transform;
+    // Last fixed-step snapshot, taken by Scene::snapshotPrevious() before the
+    // drain; rendering blends previous→current by Timer::alpha() so motion
+    // simulated at 1/60 stays smooth at any refresh rate.
+    Transform      previousTransform;
     const Mesh*    mesh{nullptr};
     const Texture* texture{nullptr};
 };
