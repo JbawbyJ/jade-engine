@@ -1,0 +1,21 @@
+# plane.obj — 2x2 ground plane on the XZ axes at y=0 (x and z from -1 to +1).
+# Right-handed OpenGL axes: +X right, +Y up, +Z toward the viewer.
+# Normal is +Y; triangles wind counter-clockwise seen from above.
+# UVs span 0..1 exactly once: the engine's Texture defaults to
+# GL_CLAMP_TO_EDGE, so UVs past 1 would clamp-smear instead of tiling.
+# Indices are v/vt/vn.
+
+v -1.0 0.0 -1.0
+v -1.0 0.0  1.0
+v  1.0 0.0  1.0
+v  1.0 0.0 -1.0
+
+vt 0.0 0.0
+vt 0.0 1.0
+vt 1.0 1.0
+vt 1.0 0.0
+
+vn 0.0 1.0 0.0
+
+f 1/1/1 2/2/1 3/3/1
+f 1/1/1 3/3/1 4/4/1

@@ -8,6 +8,7 @@ out/
 CMakeUserPresets.json
 *.user
 *.obj
+!assets/meshes/*.obj
 *.exe
 *.pdb
 *.ilk
