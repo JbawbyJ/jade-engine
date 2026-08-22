@@ -72,5 +72,6 @@ headless notes, including output-buffering caveats.
 | [GLFW](https://www.glfw.org/) | Zlib | Window + input + context |
 | [glad](https://github.com/Dav1dde/glad) | MIT | OpenGL loader (generated) |
 | [glm](https://github.com/g-truc/glm) | Happy Bunny / MIT | Math types (`math/MathTypes.h`) |
+| [doctest](https://github.com/doctest/doctest) | MIT | Unit tests (`tests/`, build-time only) |
 
 Jade Engine itself is MIT. See [LICENSE](LICENSE).

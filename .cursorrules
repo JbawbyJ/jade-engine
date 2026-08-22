@@ -15,7 +15,7 @@ on the current Phase 1 checklist in `docs/ROADMAP.md`.
 - **Name:** Jade Engine
 - **Language:** C++17 (required, extensions OFF)
 - **Build:** CMake 3.20+, Ninja preferred
-- **Deps:** vcpkg manifest (`vcpkg.json`) — glfw3, glad (`gl-api-46` + core overlay), glm.
+- **Deps:** vcpkg manifest (`vcpkg.json`) — glfw3, glad (`gl-api-46` + core overlay), glm, doctest (tests only).
 - **Binary:** `jade` → `${CMAKE_BINARY_DIR}/bin/jade`
 - **Include root:** project root (`#include "core/Window.h"`)
 
@@ -104,7 +104,8 @@ log. Zero warnings.
     ("spiral of death" guard — same idea as capping `dt` in a JS `requestAnimationFrame` loop).
   - Maintain a fixed-timestep accumulator. Default fixed step: `1/60` second
     (`kFixedDelta`).
-  - API: `tick()`, `deltaTime()`, `fixedDelta()`, `consumeFixedStep()`, `totalTime()`.
+  - API: `tick()`, `advance(float)` (deterministic test/replay seam),
+    `deltaTime()`, `fixedDelta()`, `consumeFixedStep()`, `totalTime()`.
   - No GLFW dependency. Pure chrono.
   - Wired into `main.cpp`.
 
@@ -125,9 +126,11 @@ log. Zero warnings.
 - Demo path embeds `#version 330 core` GLSL in `main.cpp` (no asset files).
 - Every GL call wraps in `GL_CHECK`. Shader compile/link throws `ShaderError`.
 
-### Phase 2 — Debug + richer GL (CURRENT)
+### Phase 2 — Debug + richer GL (DONE)
 
-Frozen interfaces — implement exactly these; flag concerns, don't improvise:
+Interfaces as frozen and built (one correction: glad 1 guards its extension
+block with the `GL_KHR_debug` macro — `GLAD_GL_KHR_debug` is the runtime int,
+so the compile-time probe uses the former):
 
 - `core/GLDebug.h` + new `core/GLDebug.cpp`: `bool installGlDebugCallback();`
   in `namespace jade`. When the context is 4.3+ or exposes `GLAD_GL_KHR_debug`:
@@ -208,6 +211,7 @@ catch-all in `main`.
 **DONE.** CMake/vcpkg, Window, Logger, GLDebug, and the main loop with
 `"Jade Engine initialized"` are landed and verified.
 
-**Next Cursor instruction that stays on rails:** Phase 1 is closed. Do not start
-Phase 2 (KHR_debug, camera helpers, extra log sinks) unless the user explicitly
-asks.
+**Next instruction that stays on rails:** Phases 1 and 2 are closed. The user
+has explicitly kicked off the full completion roadmap (Phases 3–7, demo-scene
+end state); expand each phase's section here when it becomes current, and do
+not pull work forward from an unopened phase.

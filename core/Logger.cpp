@@ -13,12 +13,12 @@ namespace jade {
 namespace {
     // One mutex serializes all log writes so concurrent threads (e.g. the
     // future async streaming queue) don't interleave characters mid-line.
-    std::mutex g_logMutex;
+    std::mutex s_logMutex;
 
-    // Optional file sink mirrored into by Logger::log. Guarded by g_logMutex
+    // Optional file sink mirrored into by Logger::log. Guarded by s_logMutex
     // (both the open/close in setFileSink and the writes in log). Closed by
     // default; when closed, logging is console-only.
-    std::ofstream g_fileSink;
+    std::ofstream s_fileSink;
 }
 
 void Logger::log(LogLevel level,
@@ -34,7 +34,7 @@ void Logger::log(LogLevel level,
            << message << '\n';
     const std::string text = record.str();
 
-    std::lock_guard<std::mutex> lock(g_logMutex);
+    std::lock_guard<std::mutex> lock(s_logMutex);
 
     // Errors go to stderr so they survive stdout redirection in tools/CI.
     // Push buffered stdout out first: it keeps combined redirects (2>&1) in
@@ -50,10 +50,10 @@ void Logger::log(LogLevel level,
     // Mirror the identical line into the file sink, if one is open. Same
     // rationale as the stdout flush above: error lines must reach disk before
     // an imminent abort, so flush the sink on Error.
-    if (g_fileSink.is_open()) {
-        g_fileSink << text;
+    if (s_fileSink.is_open()) {
+        s_fileSink << text;
         if (level == LogLevel::Error) {
-            g_fileSink.flush();
+            s_fileSink.flush();
         }
     }
 }
@@ -65,21 +65,21 @@ void Logger::setFileSink(const std::string& path) {
     bool opened = false;
     bool failed = false;
     {
-        std::lock_guard<std::mutex> lock(g_logMutex);
+        std::lock_guard<std::mutex> lock(s_logMutex);
 
-        if (g_fileSink.is_open()) {
-            g_fileSink.close();
+        if (s_fileSink.is_open()) {
+            s_fileSink.close();
         }
         // Clear any stale error bits (e.g. from a previous failed open) so
         // the stream can be reused.
-        g_fileSink.clear();
+        s_fileSink.clear();
 
         if (!path.empty()) {
             // Truncate rather than append: each setFileSink call starts a
             // fresh session log, like a dev server rewriting its log file on
             // restart. On failure the stream is left closed (console-only).
-            g_fileSink.open(path, std::ios::out | std::ios::trunc);
-            opened = g_fileSink.is_open();
+            s_fileSink.open(path, std::ios::out | std::ios::trunc);
+            opened = s_fileSink.is_open();
             failed = !opened;
         }
     }
