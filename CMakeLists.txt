@@ -26,6 +26,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 # --- Dependencies (installed via vcpkg) -------------------------------------
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glad  CONFIG REQUIRED)
+find_package(glm   CONFIG REQUIRED)
 
 # --- Engine executable ------------------------------------------------------
 # As we add modules in Phase 1, append their .cpp files here.
@@ -35,6 +36,10 @@ add_executable(jade
     core/Logger.cpp
     core/Timer.cpp
     core/Window.cpp
+    renderer/Mesh.cpp
+    renderer/Renderer.cpp
+    renderer/Shader.cpp
+    renderer/Texture.cpp
 )
 
 # Treat the project root as an include root so we can write
@@ -44,6 +49,7 @@ target_include_directories(jade PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(jade PRIVATE
     glfw
     glad::glad
+    glm::glm
 )
 
 # Strict warnings on day one. Future bugs hide behind warnings; we kill them now.

@@ -1,8 +1,8 @@
 # Jade Engine
 
 A small C++17 OpenGL engine scaffold. Phase 1 opens a GLFW window, creates a
-core-profile context, and clears the framebuffer each frame until you press ESC
-or close the window.
+core-profile context, and draws a colored triangle each frame until you press
+ESC or close the window.
 
 The name is inspired by Ubisoft's Jade engine **as branding only**. This is an
 original project. It is not Ubisoft IP, not affiliated with Ubisoft, and not
@@ -42,8 +42,8 @@ cmake --build build
 The binary is written to `build/bin/jade` (or `build/bin/Debug/jade` with the
 Visual Studio generator).
 
-Ninja is preferred but not required. The first configure builds `glfw3` and
-`glad` via the vcpkg manifest.
+Ninja is preferred but not required. The first configure builds `glfw3`,
+`glad`, and `glm` via the vcpkg manifest.
 
 ## Run
 
@@ -62,6 +62,6 @@ fallback path.
 | --- | --- | --- |
 | [GLFW](https://www.glfw.org/) | Zlib | Window + input + context |
 | [glad](https://github.com/Dav1dde/glad) | MIT | OpenGL loader (generated) |
-| [glm](https://github.com/g-truc/glm) | Happy Bunny / MIT | Not linked in Phase 1; reserved for `math/MathTypes.h` |
+| [glm](https://github.com/g-truc/glm) | Happy Bunny / MIT | Math types (`math/MathTypes.h`) |
 
 Jade Engine itself is MIT. See [LICENSE](LICENSE).
