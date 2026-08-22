@@ -132,8 +132,21 @@ void Shader::unbind() const {
 }
 
 int Shader::uniformLocation(const char* name) const {
+    // Cached: glGetUniformLocation is a driver-side string lookup, and draw
+    // paths hit setters every frame. Misses are cached as -1 with one warning
+    // so a typo'd or optimized-out name is loud exactly once, not silent.
+    const auto found = m_uniformLocations.find(name);
+    if (found != m_uniformLocations.end()) {
+        return found->second;
+    }
+
     int location = -1;
     GL_CHECK(location = glGetUniformLocation(m_id, name));
+    m_uniformLocations.emplace(name, location);
+    if (location < 0) {
+        JADE_LOG_WARN(std::string("Uniform '") + name
+                      + "' not found (misspelled or optimized out)");
+    }
     return location;
 }
 
@@ -142,6 +155,7 @@ void Shader::setInt(const char* name, int value) const {
     if (location < 0) {
         return;
     }
+    bind();
     GL_CHECK(glUniform1i(location, value));
 }
 
@@ -150,6 +164,7 @@ void Shader::setFloat(const char* name, float value) const {
     if (location < 0) {
         return;
     }
+    bind();
     GL_CHECK(glUniform1f(location, value));
 }
 
@@ -158,6 +173,7 @@ void Shader::setVec2(const char* name, const Vec2& value) const {
     if (location < 0) {
         return;
     }
+    bind();
     GL_CHECK(glUniform2f(location, value.x, value.y));
 }
 
@@ -166,6 +182,7 @@ void Shader::setVec3(const char* name, const Vec3& value) const {
     if (location < 0) {
         return;
     }
+    bind();
     GL_CHECK(glUniform3f(location, value.x, value.y, value.z));
 }
 
@@ -174,6 +191,7 @@ void Shader::setVec4(const char* name, const Vec4& value) const {
     if (location < 0) {
         return;
     }
+    bind();
     GL_CHECK(glUniform4f(location, value.x, value.y, value.z, value.w));
 }
 
@@ -182,6 +200,7 @@ void Shader::setMat4(const char* name, const Mat4& value) const {
     if (location < 0) {
         return;
     }
+    bind();
     GL_CHECK(glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value)));
 }
 

@@ -22,7 +22,13 @@ void Logger::log(LogLevel level,
     std::lock_guard<std::mutex> lock(g_logMutex);
 
     // Errors go to stderr so they survive stdout redirection in tools/CI.
+    // Push buffered stdout out first: it keeps combined redirects (2>&1) in
+    // order and makes earlier INFO/WARN lines survive an imminent abort —
+    // stderr is unit-buffered, stdout is not.
     std::ostream& out = (level == LogLevel::Error) ? std::cerr : std::cout;
+    if (level == LogLevel::Error) {
+        std::cout.flush();
+    }
 
     out << '[' << timestamp() << "] "
         << '[' << levelToString(level) << "] "

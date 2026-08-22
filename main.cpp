@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <exception>
 #include <string>
 
 #include "core/Input.h"
@@ -125,6 +126,12 @@ int main() {
         return 1;
     } catch (const ShaderError& error) {
         JADE_LOG_ERROR(std::string("Failed to start Jade Engine: ") + error.what());
+        return 1;
+    } catch (const std::exception& error) {
+        // Safety net: anything else (bad_alloc, system_error, a future
+        // subsystem's error type) still unwinds, logs, and exits instead of
+        // hitting std::terminate with no trace.
+        JADE_LOG_ERROR(std::string("Unexpected error: ") + error.what());
         return 1;
     }
 }

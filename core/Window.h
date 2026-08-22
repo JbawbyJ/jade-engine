@@ -1,8 +1,9 @@
 #pragma once
 
 // RAII wrapper around a GLFW window + an OpenGL core context.
-// Prefers 4.6 core, then falls back through 4.5 → 4.3 → 3.3. The hard
-// minimum is 3.3 core. One Window == one OS window == one GL context.
+// Prefers 4.6 core, then falls back through 4.5 → 4.3 → 4.1 → 3.3 (4.1 is
+// the macOS core-profile ceiling). The hard minimum is 3.3 core.
+// One Window == one OS window == one GL context.
 //
 // Non-copyable and non-movable (Rule of Five): the window owns a unique OS
 // resource, and GLFW's user-pointer plus the process-wide init refcount

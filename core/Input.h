@@ -51,6 +51,12 @@ public:
     void update();
 
     bool isKeyDown(int key) const;
+
+    // Edge queries compare this frame's snapshot against last frame's. A key
+    // joins the snapshot set the first time it is queried, so the very first
+    // query of a new key reports false and is accurate from the next frame on
+    // (sticky input mode keeps sub-frame taps from slipping between polls).
+    // Prefer these over isKeyDown for taps.
     bool wasKeyPressed(int key) const;   // down this frame, up last frame
     bool wasKeyReleased(int key) const;  // up this frame, down last frame
 
@@ -68,6 +74,11 @@ private:
     bool validButton(int button) const;
 
     GLFWwindow* m_window{nullptr};
+
+    // m_keyTracked is mutable so const edge queries can enroll a key into the
+    // snapshot set (a cache decision, not logical state). Seeded with the
+    // Key:: constants in the constructor.
+    mutable bool m_keyTracked[kKeyCount]{};
 
     bool m_keysDown[kKeyCount]{};
     bool m_keysDownLast[kKeyCount]{};

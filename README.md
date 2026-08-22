@@ -19,9 +19,10 @@ a fork of hogsy/jaded or any other existing Jade reimplementation.
 ### OpenGL minimum
 
 The engine **prefers OpenGL 4.6 core**, then falls back through **4.5 → 4.3 →
-3.3 core**. Startup logs the negotiated `GL_VERSION` and renderer. If nothing
-in that list is available, window creation throws `jade::WindowError` and the
-process exits with a clear error (it does not abort).
+4.1 → 3.3 core** (4.1 is the macOS core-profile ceiling). Startup logs the
+negotiated `GL_VERSION` and renderer. If nothing in that list is available,
+window creation throws `jade::WindowError` and the process exits with a clear
+error (it does not abort).
 
 **Hard minimum: OpenGL 3.3 core.**
 
@@ -51,10 +52,18 @@ Ninja is preferred but not required. The first configure builds `glfw3`,
 ./build/bin/jade
 ```
 
-ESC or the window close button exits. Headless / CI machines with no GPU
-should compile only; a live window needs a display and a GL 3.3+ driver.
-Software Mesa (llvmpipe) typically advertises 4.5 and is accepted by the
-fallback path.
+ESC or the window close button exits. Headless machines (CI, containers) run
+the engine under a virtual display with software Mesa — llvmpipe typically
+advertises 4.5, which the fallback path accepts:
+
+```bash
+LIBGL_ALWAYS_SOFTWARE=1 JADE_MAX_FRAMES=120 \
+  xvfb-run -a -s "-screen 0 1280x720x24" ./build/bin/jade
+```
+
+`JADE_MAX_FRAMES=N` exits cleanly after N frames (unset or 0 = run until
+close); CI's headless gate relies on it. See `AGENTS.md` for the full
+headless notes, including output-buffering caveats.
 
 ## Third-party notices
 
