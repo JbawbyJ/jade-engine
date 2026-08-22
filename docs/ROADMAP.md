@@ -11,6 +11,7 @@ Phase tracker for the custom C++17 / OpenGL engine (4.6 core preferred,
 - [`VERIFICATION_2026-08-22-p2.md`](./VERIFICATION_2026-08-22-p2.md) — M4 Phase 2 debug + camera
 - [`VERIFICATION_2026-08-22-p3.md`](./VERIFICATION_2026-08-22-p3.md) — M5 Phase 3 scene + transforms
 - [`VERIFICATION_2026-08-22-p4.md`](./VERIFICATION_2026-08-22-p4.md) — M6 Phase 4 assets
+- [`VERIFICATION_2026-08-22-p5.md`](./VERIFICATION_2026-08-22-p5.md) — M7 Phase 5 gameplay loop
 
 Update checkboxes when a module lands. Add a new `VERIFICATION_YYYY-MM-DD.md`
 after each meaningful checkpoint.
@@ -69,9 +70,11 @@ CI runs for these checkpoints are pending push access (see verification docs).
       tinyobjloader, plain GLSL files; `AssetError` + exe-relative
       `assetRoot()`; demo scene fully disk-loaded)
 
-## Phase 5 — Gameplay loop
+## Phase 5 — Gameplay loop (DONE)
 
-- [ ] Systems driven by the fixed timestep
+- [x] Systems driven by the fixed timestep (`game/CameraController` fly camera,
+      `game/Spinner`; snapshot + blend interpolation via `Timer::alpha()` and
+      `interpolate()`; drain loop wired in `main.cpp`)
 
 ## Phase 6 — Tooling / editor hooks
 
@@ -94,4 +97,5 @@ CI runs for these checkpoints are pending push access (see verification docs).
 | M4 Phase 2 | KHR_debug + Camera + log sink — **complete (local verify; CI pending)** |
 | M5 Phase 3 | Transform + flat scene + model-matrix draw — **complete (local verify; CI pending)** |
 | M6 Phase 4 | Disk-loaded assets + Lambert lighting — **complete (local verify; CI pending)** |
-| M7+ | Open Phase 5+ sections in `.cursorrules` as they start |
+| M7 Phase 5 | Fly camera + interpolated fixed-step loop — **complete (local verify; CI pending)** |
+| M8+ | Open Phase 6+ sections in `.cursorrules` as they start |

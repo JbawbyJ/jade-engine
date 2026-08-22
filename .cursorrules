@@ -236,7 +236,7 @@ Frozen interfaces:
   manifest gains `stb` + `tinyobjloader` (the one planned CI cache
   invalidation); the local dev loop resolves both from system packages.
 
-### Phase 5 — Gameplay loop (CURRENT)
+### Phase 5 — Gameplay loop (DONE)
 
 **Decision: snapshot + blend interpolation.** Fixed-step simulation with
 variable-rate rendering stutters without blending; each render frame draws
