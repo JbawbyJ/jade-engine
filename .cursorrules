@@ -191,7 +191,7 @@ Frozen interfaces:
 - `tests/TransformTests.cpp`: identity, pure translate, TRS ordering (a known
   point through a known transform), scale, rotation order sanity.
 
-### Phase 4 — Assets (CURRENT)
+### Phase 4 — Assets (DONE)
 
 Decisions: images via **stb** (vcpkg port `stb`), meshes via **tinyobjloader**
 (OBJ only — enough for demo props), shaders as plain text files. Loaders throw

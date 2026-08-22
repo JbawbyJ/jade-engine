@@ -10,6 +10,7 @@ Phase tracker for the custom C++17 / OpenGL engine (4.6 core preferred,
 - [`VERIFICATION_2026-08-22-p20.md`](./VERIFICATION_2026-08-22-p20.md) — Phase 2.0 hygiene + infrastructure
 - [`VERIFICATION_2026-08-22-p2.md`](./VERIFICATION_2026-08-22-p2.md) — M4 Phase 2 debug + camera
 - [`VERIFICATION_2026-08-22-p3.md`](./VERIFICATION_2026-08-22-p3.md) — M5 Phase 3 scene + transforms
+- [`VERIFICATION_2026-08-22-p4.md`](./VERIFICATION_2026-08-22-p4.md) — M6 Phase 4 assets
 
 Update checkboxes when a module lands. Add a new `VERIFICATION_YYYY-MM-DD.md`
 after each meaningful checkpoint.
@@ -62,9 +63,11 @@ CI runs for these checkpoints are pending push access (see verification docs).
 - [x] Scene ownership rules (non-owning mesh/texture pointers; creator owns —
       stated in `scene/Entity.h`; `EntityId` over references across spawns)
 
-## Phase 4 — Assets
+## Phase 4 — Assets (DONE)
 
-- [ ] Mesh / texture / shader loading from disk
+- [x] Mesh / texture / shader loading from disk (`assets/` loaders: stb,
+      tinyobjloader, plain GLSL files; `AssetError` + exe-relative
+      `assetRoot()`; demo scene fully disk-loaded)
 
 ## Phase 5 — Gameplay loop
 
@@ -90,4 +93,5 @@ CI runs for these checkpoints are pending push access (see verification docs).
 | M3 Phase 1 exit | All Phase 1 modules checked above — **complete** |
 | M4 Phase 2 | KHR_debug + Camera + log sink — **complete (local verify; CI pending)** |
 | M5 Phase 3 | Transform + flat scene + model-matrix draw — **complete (local verify; CI pending)** |
-| M6+ | Open Phase 4+ sections in `.cursorrules` as they start |
+| M6 Phase 4 | Disk-loaded assets + Lambert lighting — **complete (local verify; CI pending)** |
+| M7+ | Open Phase 5+ sections in `.cursorrules` as they start |
