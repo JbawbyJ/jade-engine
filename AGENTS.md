@@ -1,9 +1,9 @@
 # Jade Engine
 
 Custom C++17 game engine (Phase 1). It opens a GLFW window, creates an OpenGL
-core-profile context (prefers 4.6, falls back to 4.5 / 4.3 / 3.3), and clears
-the framebuffer every frame until you press ESC or close the window.
-Dependencies (`glfw3`, `glad`) are managed with vcpkg and wired in through
+core-profile context (prefers 4.6, falls back to 4.5 / 4.3 / 3.3), and draws a
+colored triangle every frame until you press ESC or close the window.
+Dependencies (`glfw3`, `glad`, `glm`) are managed with vcpkg and wired in through
 CMake. `glad` is generated for GL 4.6 **core** via `gl-api-46` plus the
 `overlays/glad` port (`GLAD_PROFILE=core`).
 

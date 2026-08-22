@@ -15,7 +15,7 @@ on the current Phase 1 checklist in `docs/ROADMAP.md`.
 - **Name:** Jade Engine
 - **Language:** C++17 (required, extensions OFF)
 - **Build:** CMake 3.20+, Ninja preferred
-- **Deps:** vcpkg manifest (`vcpkg.json`) — glfw3, glad (`gl-api-46` + core overlay). glm returns with `math/MathTypes.h`.
+- **Deps:** vcpkg manifest (`vcpkg.json`) — glfw3, glad (`gl-api-46` + core overlay), glm.
 - **Binary:** `jade` → `${CMAKE_BINARY_DIR}/bin/jade`
 - **Include root:** project root (`#include "core/Window.h"`)
 
@@ -71,24 +71,24 @@ on the current Phase 1 checklist in `docs/ROADMAP.md`.
 
 ## Phase plan (7 phases)
 
-### Phase 1 — Foundation (CURRENT)
+### Phase 1 — Foundation (DONE)
 
 Goal: open a window, tick time, read input, clear a framebuffer with a real
 renderer skeleton. Exit when a colored mesh can be drawn under a fixed timestep.
 
 | Module | Path | Status | Spec |
 | --- | --- | --- | --- |
-| Build wiring | `CMakeLists.txt`, `vcpkg.json` | DONE | C++17, vcpkg toolchain auto-pickup, find_package glfw3/glad, glad overlay core 4.6, strict warnings |
+| Build wiring | `CMakeLists.txt`, `vcpkg.json` | DONE | C++17, vcpkg toolchain auto-pickup, find_package glfw3/glad/glm, glad overlay core 4.6, strict warnings |
 | Logger | `core/Logger.h/.cpp` | DONE | Thread-safe, ms timestamps, INFO/WARN/ERROR, `__FILE__:__LINE__`, errors → stderr |
 | GLDebug | `core/GLDebug.h` | DONE | `GL_CHECK` drains `glGetError` after every GL call |
 | Window | `core/Window.h/.cpp` | DONE | GLFW window, GL 4.6→3.3 core fallback, `WindowError` on init failure, debug context in non-NDEBUG, GLAD after context, separate window/FB size, vsync on, RAII + mutex GLFW refcount |
 | Timer | `core/Timer.h/.cpp` | DONE | Delta time + fixed-timestep accumulator. See module spec below. |
 | Input | `core/Input.h/.cpp` | DONE | Replace inline `glfwGetKey` in `main.cpp`. Keyboard + mouse query API. |
-| Math types | `math/MathTypes.h` | NEXT | Thin glm aliases / engine typedefs used by renderer |
-| Renderer | `renderer/Renderer.h/.cpp` | OPEN | Clear + draw orchestration |
-| Shader | `renderer/Shader.h/.cpp` | OPEN | Compile/link GLSL, uniform setters |
-| Mesh | `renderer/Mesh.h/.cpp` | OPEN | VAO/VBO/EBO wrapper |
-| Texture | `renderer/Texture.h/.cpp` | OPEN | 2D texture upload / bind |
+| Math types | `math/MathTypes.h` | DONE | Thin glm aliases (`Vec2`/`Vec3`/`Vec4`/`Mat3`/`Mat4`/`IVec2`) |
+| Renderer | `renderer/Renderer.h/.cpp` | DONE | Clear + draw orchestration (`beginFrame`, `draw`) |
+| Shader | `renderer/Shader.h/.cpp` | DONE | Compile/link GLSL from memory, uniform setters, `ShaderError` on failure |
+| Mesh | `renderer/Mesh.h/.cpp` | DONE | VAO/VBO/EBO wrapper, `Vertex` = position + color + UV |
+| Texture | `renderer/Texture.h/.cpp` | DONE | 2D RGBA8 upload / bind (demo uses a real 1x1 white) |
 
 **Phase 1 exit criteria:** window + logger + timer (fixed step) + input module +
 a renderer that draws at least one mesh with a shader. ESC quits. Clean shutdown
@@ -106,7 +106,7 @@ log. Zero warnings.
     (`kFixedDelta`).
   - API: `tick()`, `deltaTime()`, `fixedDelta()`, `consumeFixedStep()`, `totalTime()`.
   - No GLFW dependency. Pure chrono.
-  - Wired into `main.cpp`. ESC remains inline until Input lands (`TODO(jade)`).
+  - Wired into `main.cpp`.
 
 #### Input module spec (DONE)
 
@@ -118,11 +118,12 @@ log. Zero warnings.
 - `Key::` / `Mouse::` constants so call sites need not include GLFW.
 - ESC path in `main.cpp` uses `input.isKeyDown(Key::Escape)`.
 
-#### Renderer module group (build this next — closes Phase 1)
+#### Renderer module group (DONE — closes Phase 1)
 
-- `MathTypes.h` first if the renderer needs vec/mat aliases.
+- `math/MathTypes.h` — glm aliases used by Shader / Mesh / Renderer.
 - Shader → Mesh → Texture → Renderer orchestration.
-- Still wrap every GL call in `GL_CHECK`.
+- Demo path embeds `#version 330 core` GLSL in `main.cpp` (no asset files).
+- Every GL call wraps in `GL_CHECK`. Shader compile/link throws `ShaderError`.
 
 ### Phase 2 — Debug + richer GL
 
@@ -177,6 +178,6 @@ after successful `glfwInit`. `requestClose()` is no longer `const`.
 **DONE.** CMake/vcpkg, Window, Logger, GLDebug, and the main loop with
 `"Jade Engine initialized"` are landed and verified.
 
-**Next Cursor instruction that stays on rails:** open `math/MathTypes.h`, then
-the `renderer/` group (Shader → Mesh → Texture → Renderer). Do not start Phase 2
-in the same change unless the user explicitly asks.
+**Next Cursor instruction that stays on rails:** Phase 1 is closed. Do not start
+Phase 2 (KHR_debug, camera helpers, extra log sinks) unless the user explicitly
+asks.
