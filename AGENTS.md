@@ -1,9 +1,11 @@
 # Jade Engine
 
-Custom C++17 game engine (Phase 1). It opens a GLFW window, creates an OpenGL 4.6
-core-profile context, and clears the framebuffer every frame until you press ESC or
-close the window. Dependencies (`glfw3`, `glad`, `glm`) are managed with vcpkg and
-wired in through CMake.
+Custom C++17 game engine (Phase 1). It opens a GLFW window, creates an OpenGL
+core-profile context (prefers 4.6, falls back to 4.5 / 4.3 / 3.3), and clears
+the framebuffer every frame until you press ESC or close the window.
+Dependencies (`glfw3`, `glad`) are managed with vcpkg and wired in through
+CMake. `glad` is generated for GL 4.6 **core** via `gl-api-46` plus the
+`overlays/glad` port (`GLAD_PROFILE=core`).
 
 ## Cursor Cloud specific instructions
 
@@ -21,7 +23,7 @@ the non-obvious things to know when developing here.
 - Configure (also triggers vcpkg to install manifest deps into `build/vcpkg_installed/`):
   `cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE="$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake"`
 - Build: `cmake --build build`. The executable is written to `build/bin/jade`.
-- Ninja is the generator. The first configure on a cold cache builds glfw3/glad/glm from
+- Ninja is the generator. The first configure on a cold cache builds glfw3/glad from
   source; afterwards vcpkg's binary cache makes it fast.
 
 ### Lint
@@ -36,10 +38,15 @@ the non-obvious things to know when developing here.
 ### Run (headless caveat — important)
 
 The VM has no GPU or physical display, so the engine must run under a virtual X server
-(`Xvfb`) with Mesa software rendering. Critically, the software renderer (llvmpipe) only
-advertises OpenGL 4.5, but the engine requests a 4.6 core context and calls
-`JADE_ASSERT` (which `abort()`s) if creation fails — so you MUST override the reported GL
-version. Run it like this:
+(`Xvfb`) with Mesa software rendering. llvmpipe typically advertises OpenGL 4.5; the
+engine falls back from 4.6, so a version override is optional. Run it like this:
+
+```bash
+LIBGL_ALWAYS_SOFTWARE=1 \
+  xvfb-run -a -s "-screen 0 1280x720x24" ./build/bin/jade
+```
+
+To force the advertised version (useful if you want to exercise the 4.6 path):
 
 ```bash
 LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=4.6 MESA_GLSL_VERSION_OVERRIDE=460 \

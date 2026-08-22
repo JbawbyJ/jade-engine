@@ -1,10 +1,14 @@
 {
   "name": "jade-engine",
-  "version-string": "0.1.0",
-  "description": "Jade Engine - custom C++ game engine inspired by Ubisoft Jade",
+  "version": "0.1.0",
+  "description": "Jade Engine - custom C++ game engine inspired by Ubisoft Jade (branding only)",
   "dependencies": [
     "glfw3",
-    "glad",
-    "glm"
+    {
+      "name": "glad",
+      "features": [
+        "gl-api-46"
+      ]
+    }
   ]
 }

@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.20)
 
+# Overlay the glad port so vcpkg generates a core-profile loader.
+# Must be visible before the vcpkg toolchain runs at project().
+if(NOT DEFINED VCPKG_OVERLAY_PORTS)
+    set(VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_LIST_DIR}/overlays")
+endif()
+
 # Pick up vcpkg toolchain BEFORE project() if VCPKG_ROOT is set.
 # This lets `find_package` discover libraries vcpkg installs.
 if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
@@ -20,7 +26,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 # --- Dependencies (installed via vcpkg) -------------------------------------
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glad  CONFIG REQUIRED)
-find_package(glm   CONFIG REQUIRED)
 
 # --- Engine executable ------------------------------------------------------
 # As we add modules in Phase 1, append their .cpp files here.
@@ -39,7 +44,6 @@ target_include_directories(jade PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(jade PRIVATE
     glfw
     glad::glad
-    glm::glm
 )
 
 # Strict warnings on day one. Future bugs hide behind warnings; we kill them now.
