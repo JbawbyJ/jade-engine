@@ -15,6 +15,8 @@
 #include "core/Logger.h"
 #include "core/Timer.h"
 #include "core/Window.h"
+#include "game/CameraController.h"
+#include "game/Spinner.h"
 #include "math/Transform.h"
 #include "renderer/Camera.h"
 #include "renderer/Mesh.h"
@@ -50,7 +52,10 @@ int main() {
 
         // Lit ground plane with three cubes resting on it (plane top sits at
         // y = -0.6; each cube's center is that plus half its scaled height).
+        // The center and right cubes spin under the fixed timestep.
         Scene scene;
+        EntityId spinCenter = 0;
+        EntityId spinRight = 0;
         {
             Entity& ground = scene.createEntity("ground");
             ground.mesh = planeMesh.get();
@@ -62,6 +67,7 @@ int main() {
             cubeA.mesh = cubeMesh.get();
             cubeA.texture = checker.get();
             cubeA.transform.position = {0.0f, -0.1f, 0.0f};
+            spinCenter = scene.entities().size() - 1;
 
             Entity& cubeB = scene.createEntity("cube-left");
             cubeB.mesh = cubeMesh.get();
@@ -76,12 +82,15 @@ int main() {
             cubeC.transform.position = {1.3f, -0.35f, 0.6f};
             cubeC.transform.rotationEuler.y = -0.7f;
             cubeC.transform.scale = {0.5f, 0.5f, 0.5f};
+            spinRight = scene.entities().size() - 1;
         }
+        scene.snapshotPrevious(); // valid previous transforms before frame one
 
-        // Static camera two units back on +Z, looking at the triangle. The
-        // Phase 5 controller will fly it; for now only the aspect tracks the
-        // framebuffer so resizing never stretches the scene. Both aspect
-        // paths guard height 0 (minimized / not-yet-realized framebuffers).
+        // Start slightly raised and pulled back, looking gently down at the
+        // scene; the controller seeds its authoritative pose from this. Both
+        // aspect paths guard height 0 (minimized / unrealized framebuffers).
+        camera.setPosition({0.0f, 0.5f, 3.0f});
+        camera.setPitch(-0.12f);
         if (window.framebufferHeight() > 0) {
             camera.setAspect(static_cast<float>(window.framebufferWidth())
                              / static_cast<float>(window.framebufferHeight()));
@@ -91,6 +100,13 @@ int main() {
                 camera.setAspect(static_cast<float>(width) / static_cast<float>(height));
             }
         });
+
+        // Fly camera (WASD + Space/LeftShift, right-drag look) and the
+        // spinning-cube prover, both stepped only inside the fixed drain.
+        CameraController controller(camera);
+        Spinner spinner(0.8f); // rad/s: clearly moving, not dizzying
+        spinner.add(spinCenter);
+        spinner.add(spinRight);
 
         JADE_LOG_INFO("Jade Engine initialized");
 
@@ -120,10 +136,18 @@ int main() {
                 window.requestClose();
             }
 
+            // Snapshot BEFORE the drain: rendering blends the two most recent
+            // simulation states by alpha, the classic fixed-update /
+            // interpolated-render split this loop was built for.
+            scene.snapshotPrevious();
+            controller.snapshotPrevious();
             while (timer.consumeFixedStep()) {
-                // TODO(jade): Phase 5 gameplay systems consume the fixed step
+                controller.fixedUpdate(input, timer.fixedDelta());
+                spinner.fixedUpdate(scene, timer.fixedDelta());
             }
 
+            const float alpha = timer.alpha();
+            controller.writeToCamera(alpha);
             renderer.setViewProjection(camera.viewProjection());
             renderer.beginFrame();
             for (const Entity& entity : scene.entities()) {
@@ -131,7 +155,8 @@ int main() {
                     continue; // nothing to draw yet — entities may be data-only
                 }
                 renderer.draw(*entity.mesh, *shader, *entity.texture,
-                              entity.transform.matrix());
+                              interpolate(entity.previousTransform,
+                                          entity.transform, alpha));
             }
 
             window.swapBuffers();

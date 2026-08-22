@@ -66,6 +66,8 @@ add_executable(jade
     core/Logger.cpp
     core/Timer.cpp
     core/Window.cpp
+    game/CameraController.cpp
+    game/Spinner.cpp
     math/Transform.cpp
     renderer/Camera.cpp
     renderer/Mesh.cpp
