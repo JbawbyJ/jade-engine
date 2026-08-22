@@ -2,6 +2,7 @@
 // Phase 1: window + timer + input + a colored mesh drawn each frame.
 
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 
 #include "core/Input.h"
@@ -74,6 +75,19 @@ int main() {
 
         JADE_LOG_INFO("Jade Engine initialized");
 
+        // Optional frame cap for headless / CI runs: JADE_MAX_FRAMES=N requests
+        // a clean close after N frames (unset or 0 = run until the user quits).
+        // A deterministic exit beats killing the process with `timeout`, which
+        // would skip the shutdown log the CI gate asserts on.
+        unsigned long framesRemaining = 0;
+        if (const char* frameCap = std::getenv("JADE_MAX_FRAMES")) {
+            framesRemaining = std::strtoul(frameCap, nullptr, 10);
+            if (framesRemaining > 0) {
+                JADE_LOG_INFO(std::string("Frame cap active: JADE_MAX_FRAMES=")
+                              + std::to_string(framesRemaining));
+            }
+        }
+
         // Variable-render / fixed-update loop. Simulation work goes inside the
         // consumeFixedStep drain; rendering stays outside and uses deltaTime().
         while (!window.shouldClose()) {
@@ -93,6 +107,10 @@ int main() {
             renderer.draw(triangle, shader, white);
 
             window.swapBuffers();
+
+            if (framesRemaining > 0 && --framesRemaining == 0) {
+                window.requestClose();
+            }
         }
 
         const MousePosition mouse = input.mousePosition();

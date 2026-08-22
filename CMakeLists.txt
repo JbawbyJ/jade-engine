@@ -24,8 +24,20 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
 # --- Dependencies (installed via vcpkg) -------------------------------------
+# JADE_LOCAL_GLAD_DIR is a dev-container escape hatch: sandboxes that cannot
+# run vcpkg point it at a pre-generated glad tree
+# (python3 -m glad --generator=c --api="gl=4.6" --profile=core) and resolve
+# glfw3/glm/doctest from system packages instead. CI + vcpkg stay authoritative.
+if(JADE_LOCAL_GLAD_DIR)
+    enable_language(C) # glad.c — the project is otherwise CXX-only
+    add_library(jade_local_glad STATIC "${JADE_LOCAL_GLAD_DIR}/src/glad.c")
+    target_include_directories(jade_local_glad SYSTEM PUBLIC "${JADE_LOCAL_GLAD_DIR}/include")
+    target_link_libraries(jade_local_glad PUBLIC ${CMAKE_DL_LIBS})
+    add_library(glad::glad ALIAS jade_local_glad)
+else()
+    find_package(glad CONFIG REQUIRED)
+endif()
 find_package(glfw3 CONFIG REQUIRED)
-find_package(glad  CONFIG REQUIRED)
 find_package(glm   CONFIG REQUIRED)
 
 # --- Engine executable ------------------------------------------------------
@@ -43,8 +55,13 @@ add_executable(jade
 )
 
 # Treat the project root as an include root so we can write
-# #include "core/Window.h" from anywhere.
-target_include_directories(jade PRIVATE ${CMAKE_SOURCE_DIR})
+# #include "core/Window.h" from anywhere. CMAKE_CURRENT_SOURCE_DIR (not
+# CMAKE_SOURCE_DIR) so the project still works under add_subdirectory.
+target_include_directories(jade PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+# GLFW must never drag system GL headers in behind glad's back; with
+# GLFW_INCLUDE_NONE the glad-before-GLFW include-order trap cannot fire.
+target_compile_definitions(jade PRIVATE GLFW_INCLUDE_NONE)
 
 target_link_libraries(jade PRIVATE
     glfw
@@ -53,8 +70,43 @@ target_link_libraries(jade PRIVATE
 )
 
 # Strict warnings on day one. Future bugs hide behind warnings; we kill them now.
+# Shared via an interface target so every engine target (jade, jade_tests)
+# compiles under the identical flag set.
+# JADE_WERROR stays OFF for local dev (a newer local compiler's novel warning
+# must not brick the loop); CI configures with -DJADE_WERROR=ON as the gate.
+option(JADE_WERROR "Treat compiler warnings as errors" OFF)
+
+add_library(jade_warnings INTERFACE)
 if(MSVC)
-    target_compile_options(jade PRIVATE /W4 /permissive-)
+    target_compile_options(jade_warnings INTERFACE /W4 /permissive-)
+    if(JADE_WERROR)
+        target_compile_options(jade_warnings INTERFACE /WX)
+    endif()
 else()
-    target_compile_options(jade PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(jade_warnings INTERFACE -Wall -Wextra -Wpedantic)
+    if(JADE_WERROR)
+        target_compile_options(jade_warnings INTERFACE -Werror)
+    endif()
+endif()
+
+target_link_libraries(jade PRIVATE jade_warnings)
+
+# --- Unit tests -------------------------------------------------------------
+# GL-free logic only (Timer, math): tests never create a window or a context,
+# so they run on every CI leg including macOS.
+option(JADE_BUILD_TESTS "Build jade unit tests" ON)
+if(JADE_BUILD_TESTS)
+    find_package(doctest CONFIG REQUIRED)
+
+    add_executable(jade_tests
+        tests/TestMain.cpp
+        tests/TimerTests.cpp
+        tests/MathTests.cpp
+        core/Timer.cpp
+    )
+    target_include_directories(jade_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(jade_tests PRIVATE doctest::doctest glm::glm jade_warnings)
+
+    enable_testing()
+    add_test(NAME jade_tests COMMAND jade_tests)
 endif()

@@ -21,7 +21,14 @@ void Timer::tick() {
     const std::chrono::duration<float> elapsed = now - m_last;
     m_last = now;
 
-    m_delta = elapsed.count();
+    advance(elapsed.count());
+}
+
+void Timer::advance(float rawSeconds) {
+    // Pure state-advance step, split out of tick() so tests and replays can
+    // drive the timer deterministically. Deliberately leaves m_last and
+    // m_started alone — only tick() owns the wall-clock baseline.
+    m_delta = rawSeconds;
     if (m_delta > kMaxDelta) {
         m_delta = kMaxDelta;
     }

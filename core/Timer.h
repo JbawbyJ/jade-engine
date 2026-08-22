@@ -17,6 +17,14 @@ public:
     // Advance the clock. Call once at the start of each frame.
     void tick();
 
+    // Advance frame state by a raw elapsed span without touching the wall
+    // clock: clamps to kMaxDelta, sets deltaTime(), and feeds the fixed-step
+    // accumulator and totalTime(). This is the deterministic seam for tests
+    // and replays — like injecting a fake dt into a JS game loop instead of
+    // reading performance.now(). Real frames still come from tick(), which
+    // measures the span and delegates here.
+    void advance(float rawSeconds);
+
     // Seconds since the previous tick (clamped to avoid spiral-of-death).
     float deltaTime() const { return m_delta; }
 
