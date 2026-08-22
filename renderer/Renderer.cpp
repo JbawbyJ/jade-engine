@@ -29,14 +29,21 @@ void Renderer::beginFrame() const {
 void Renderer::draw(const Mesh& mesh, const Shader& shader) const {
     shader.bind();
     shader.setMat4("uViewProj", m_viewProjection);
+    shader.setMat4("uModel", Mat4{1.0f});
     mesh.draw();
 }
 
 void Renderer::draw(const Mesh& mesh, const Shader& shader, const Texture& texture) const {
+    draw(mesh, shader, texture, Mat4{1.0f});
+}
+
+void Renderer::draw(const Mesh& mesh, const Shader& shader, const Texture& texture,
+                    const Mat4& model) const {
     shader.bind();
     texture.bind(0);
     shader.setInt("uTexture", 0);
     shader.setMat4("uViewProj", m_viewProjection);
+    shader.setMat4("uModel", model);
     mesh.draw();
 }
 

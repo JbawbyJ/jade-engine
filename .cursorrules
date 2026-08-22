@@ -161,10 +161,35 @@ Decisions: KHR_debug is push-based and replaces poll-only `GL_CHECK` on 4.3+
 contexts (llvmpipe's 4.5 in CI exercises it); pitch clamping is the Phase 5
 controller's job — Camera stores what it is given.
 
-### Phase 3 — Scene / transforms
+### Phase 3 — Scene / transforms (CURRENT)
 
-- Entity or node transform hierarchy.
-- Basic scene graph or flat entity list — pick one style and stay consistent.
+**Decision: flat entity list, no hierarchy.** The demo end state (camera over
+a handful of meshes) never needs parenting; `Transform::matrix()` keeps the
+seam open — parenting later is matrix multiplication, not a rewrite.
+
+Frozen interfaces:
+
+- `math/Transform.h` + `.cpp` (implementation in the .cpp so glm/gtc stays out
+  of includers, per standards rule 14): `struct Transform { Vec3 position{0};
+  Vec3 rotationEuler{0}; Vec3 scale{1}; Mat4 matrix() const; }` — radians;
+  compose T · Ry(y) · Rx(x) · Rz(z) · S (yaw-pitch-roll order). Euler chosen
+  over quaternions deliberately at demo scale; documented upgrade note.
+- `scene/Entity.h`: `struct Entity { std::string name; Transform transform;
+  const Mesh* mesh{nullptr}; const Texture* texture{nullptr}; }` — mesh and
+  texture are **non-owning**; ownership stays with the creator (main now,
+  asset loaders in Phase 4). That is the scene ownership rule; state it in
+  the header comment.
+- `scene/Scene.h/.cpp`: `using EntityId = std::size_t;` (index into the list).
+  `class Scene { Entity& createEntity(std::string name);
+  std::vector<Entity>& entities(); const std::vector<Entity>& entities() const;
+  }` — returned `Entity&` invalidates on the next `createEntity` (vector
+  reallocation); hold `EntityId`, not references. No removal in Phase 3
+  (`TODO(jade)` for removal + generation ids when gameplay needs them).
+- `Renderer::draw(const Mesh&, const Shader&, const Texture&, const Mat4&
+  model)` uploads `uModel`; existing overloads forward identity. Demo shaders
+  become `uViewProj * uModel * vec4(aPosition, 1.0)`.
+- `tests/TransformTests.cpp`: identity, pure translate, TRS ordering (a known
+  point through a known transform), scale, rotation order sanity.
 
 ### Phase 4 — Assets
 

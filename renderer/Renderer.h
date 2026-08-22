@@ -32,6 +32,10 @@ public:
     void beginFrame() const;
     void draw(const Mesh& mesh, const Shader& shader) const;
     void draw(const Mesh& mesh, const Shader& shader, const Texture& texture) const;
+    // Model-matrix overload for scene entities: uploads `uModel` alongside
+    // `uViewProj`. The overloads without a model forward identity.
+    void draw(const Mesh& mesh, const Shader& shader, const Texture& texture,
+              const Mat4& model) const;
 
 private:
     Vec4 m_clearColor{0.10f, 0.10f, 0.12f, 1.0f};

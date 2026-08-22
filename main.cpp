@@ -10,11 +10,13 @@
 #include "core/Logger.h"
 #include "core/Timer.h"
 #include "core/Window.h"
+#include "math/Transform.h"
 #include "renderer/Camera.h"
 #include "renderer/Mesh.h"
 #include "renderer/Renderer.h"
 #include "renderer/Shader.h"
 #include "renderer/Texture.h"
+#include "scene/Scene.h"
 
 namespace {
 
@@ -27,6 +29,7 @@ layout (location = 1) in vec3 aColor;
 layout (location = 2) in vec2 aTexCoord;
 
 uniform mat4 uViewProj;
+uniform mat4 uModel;
 
 out vec3 vColor;
 out vec2 vTexCoord;
@@ -34,7 +37,7 @@ out vec2 vTexCoord;
 void main() {
     vColor = aColor;
     vTexCoord = aTexCoord;
-    gl_Position = uViewProj * vec4(aPosition, 1.0);
+    gl_Position = uViewProj * uModel * vec4(aPosition, 1.0);
 }
 )";
 
@@ -82,6 +85,37 @@ int main() {
         // Real 1x1 white RGBA upload. Sampling it leaves vertex colors unchanged.
         const unsigned char kWhiteRgba[] = {255, 255, 255, 255};
         Texture white(1, 1, kWhiteRgba);
+
+        // Flat scene: four views of the one triangle mesh, each with its own
+        // transform. Mesh/texture pointers are non-owning — the objects above
+        // outlive the scene (declared earlier in this scope).
+        Scene scene;
+        {
+            Entity& center = scene.createEntity("triangle-center");
+            center.mesh = &triangle;
+            center.texture = &white;
+
+            Entity& left = scene.createEntity("triangle-left");
+            left.mesh = &triangle;
+            left.texture = &white;
+            left.transform.position = {-1.1f, 0.0f, -0.8f};
+            left.transform.rotationEuler.y = 0.6f;
+            left.transform.scale = {0.6f, 0.6f, 0.6f};
+
+            Entity& right = scene.createEntity("triangle-right");
+            right.mesh = &triangle;
+            right.texture = &white;
+            right.transform.position = {1.1f, 0.0f, -0.8f};
+            right.transform.rotationEuler.y = -0.6f;
+            right.transform.scale = {0.6f, 0.6f, 0.6f};
+
+            Entity& distant = scene.createEntity("triangle-far");
+            distant.mesh = &triangle;
+            distant.texture = &white;
+            distant.transform.position = {0.0f, 0.9f, -1.5f};
+            distant.transform.rotationEuler.z = 3.14159265f; // roll: upside down
+            distant.transform.scale = {0.4f, 0.4f, 0.4f};
+        }
 
         // Static camera two units back on +Z, looking at the triangle. The
         // Phase 5 controller will fly it; for now only the aspect tracks the
@@ -131,7 +165,13 @@ int main() {
 
             renderer.setViewProjection(camera.viewProjection());
             renderer.beginFrame();
-            renderer.draw(triangle, shader, white);
+            for (const Entity& entity : scene.entities()) {
+                if (entity.mesh == nullptr || entity.texture == nullptr) {
+                    continue; // nothing to draw yet — entities may be data-only
+                }
+                renderer.draw(*entity.mesh, shader, *entity.texture,
+                              entity.transform.matrix());
+            }
 
             window.swapBuffers();
 

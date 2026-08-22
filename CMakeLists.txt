@@ -49,11 +49,13 @@ add_executable(jade
     core/Logger.cpp
     core/Timer.cpp
     core/Window.cpp
+    math/Transform.cpp
     renderer/Camera.cpp
     renderer/Mesh.cpp
     renderer/Renderer.cpp
     renderer/Shader.cpp
     renderer/Texture.cpp
+    scene/Scene.cpp
 )
 
 # Treat the project root as an include root so we can write
