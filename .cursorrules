@@ -318,7 +318,7 @@ Frozen interfaces:
   Explicitly NOT an editor shell.
 - Log file sink already landed in Phase 2 (did not slip).
 
-### Phase 7 — Polish + packaging (CURRENT)
+### Phase 7 — Polish + packaging (DONE)
 
 - `project(... VERSION 0.1.0)`; `JADE_VERSION` compile definition feeds the
   startup log from the single authoritative version.
@@ -355,7 +355,7 @@ catch-all in `main`.
 **DONE.** CMake/vcpkg, Window, Logger, GLDebug, and the main loop with
 `"Jade Engine initialized"` are landed and verified.
 
-**Next instruction that stays on rails:** Phases 1 and 2 are closed. The user
-has explicitly kicked off the full completion roadmap (Phases 3–7, demo-scene
-end state); expand each phase's section here when it becomes current, and do
-not pull work forward from an unopened phase.
+**Next instruction that stays on rails:** all seven phases are closed —
+M-final is met (see docs/VERIFICATION_2026-08-22-final.md). New work means a
+new roadmap section agreed with the user first; do not reopen closed phases
+except to fix verified defects.

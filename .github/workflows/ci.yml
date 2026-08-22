@@ -107,7 +107,7 @@ jobs:
 
       - name: Package
         shell: bash
-        run: cd build && cpack
+        run: cd build && cpack -C Release
 
       - name: Upload package
         uses: actions/upload-artifact@v4
@@ -123,7 +123,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          LIBGL_ALWAYS_SOFTWARE=1 JADE_MAX_FRAMES=120 \
+          LIBGL_ALWAYS_SOFTWARE=1 JADE_MAX_FRAMES=120 JADE_SECOND_WINDOW=1 \
             xvfb-run -a -s "-screen 0 1280x720x24" ./build/bin/jade 2>&1 | tee run.log
           if ! grep -q "Jade Engine initialized" run.log; then
             echo "Headless run gate FAILED: 'Jade Engine initialized' not found in run.log"
@@ -138,3 +138,13 @@ jobs:
             exit 1
           fi
           echo "Headless run gate passed"
+
+      - name: Package smoke (unpack + run)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/jade-pkg && tar xzf build/jade-engine-*.tar.gz -C /tmp/jade-pkg --strip-components=1
+          LIBGL_ALWAYS_SOFTWARE=1 JADE_MAX_FRAMES=60 \
+            xvfb-run -a -s "-screen 0 1280x720x24" /tmp/jade-pkg/jade 2>&1 | tee pkg.log
+          grep -q "Jade Engine shutdown" pkg.log || { echo "Package smoke FAILED"; exit 1; }

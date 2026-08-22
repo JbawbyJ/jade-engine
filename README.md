@@ -35,7 +35,7 @@ archive locally.
 
 ## Build from source
 
-- CMake 3.20+
+- CMake 3.21+
 - A C++17 compiler
 - [vcpkg](https://github.com/microsoft/vcpkg) (`VCPKG_ROOT` exported, or pass
   `-DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake`)
@@ -122,3 +122,6 @@ the full phase-by-phase history. `docs/ROADMAP.md` tracks module status, and
 the dated `docs/VERIFICATION_*.md` files record what was verified at each
 checkpoint. Development is phase-gated — finish the current module before
 opening the next.
+
+Performance: not profiled; no known hotspots at demo scale. Performance
+passes happen with a profiler, not guesswork.

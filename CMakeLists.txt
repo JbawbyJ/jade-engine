@@ -1,4 +1,6 @@
-cmake_minimum_required(VERSION 3.20)
+# 3.21 for TARGET_RUNTIME_DLLS (the Windows package must carry the vcpkg
+# dynamic-triplet DLLs or the unpacked exe dies at load).
+cmake_minimum_required(VERSION 3.21)
 
 # Overlay the glad port so vcpkg generates a core-profile loader.
 # Must be visible before the vcpkg toolchain runs at project().
@@ -13,6 +15,8 @@ if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
         CACHE STRING "vcpkg toolchain file")
 endif()
 
+# Bump vcpkg.json's "version" together with this — the manifest cannot read
+# CMake variables, so the two declarations must be kept in lockstep by hand.
 project(JadeEngine VERSION 0.1.0 LANGUAGES CXX)
 
 # C++17, no compiler extensions, standard is required (not "preferred").
@@ -123,10 +127,17 @@ add_dependencies(jade_assets jade)
 # build dir. ZIP on Windows, TGZ elsewhere; `cmake --build build --target
 # package` (or cpack) produces jade-engine-<version>-<system>.<ext>.
 install(TARGETS jade RUNTIME DESTINATION .)
+if(WIN32)
+    # vcpkg's default dynamic triplet builds glfw3/tinyobjloader as DLLs;
+    # applocal copies them next to the BUILD-tree exe only, so the package
+    # must install them too or the shipped exe fails to load.
+    install(FILES $<TARGET_RUNTIME_DLLS:jade> DESTINATION .)
+endif()
 install(DIRECTORY assets/meshes assets/shaders assets/textures DESTINATION assets)
 set(CPACK_PACKAGE_NAME "jade-engine")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
-set(CPACK_PACKAGE_FILE_NAME "jade-engine-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}")
+set(CPACK_PACKAGE_FILE_NAME
+    "jade-engine-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 if(WIN32)
     set(CPACK_GENERATOR "ZIP")
 else()

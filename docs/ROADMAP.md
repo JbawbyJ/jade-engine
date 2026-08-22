@@ -13,6 +13,7 @@ Phase tracker for the custom C++17 / OpenGL engine (4.6 core preferred,
 - [`VERIFICATION_2026-08-22-p4.md`](./VERIFICATION_2026-08-22-p4.md) — M6 Phase 4 assets
 - [`VERIFICATION_2026-08-22-p5.md`](./VERIFICATION_2026-08-22-p5.md) — M7 Phase 5 gameplay loop
 - [`VERIFICATION_2026-08-22-p6.md`](./VERIFICATION_2026-08-22-p6.md) — M8 Phase 6 tooling
+- [`VERIFICATION_2026-08-22-final.md`](./VERIFICATION_2026-08-22-final.md) — M-final: Phase 7 + roadmap completion
 
 Update checkboxes when a module lands. Add a new `VERIFICATION_YYYY-MM-DD.md`
 after each meaningful checkpoint.
@@ -82,9 +83,11 @@ CI runs for these checkpoints are pending push access (see verification docs).
 - [x] Multi-window / debug draw (`renderer/DebugDraw` line batcher on F1;
       `JADE_SECOND_WINDOW=1` proof + `Window::makeCurrent`)
 
-## Phase 7 — Polish + packaging
+## Phase 7 — Polish + packaging (DONE)
 
-- [ ] Release config, packaging, end-user README
+- [x] Release config, packaging, end-user README (version stamp, CPack flat
+      package + CI artifacts with a package smoke test, demo-first README,
+      honest perf note: not profiled, no known hotspots at demo scale)
 
 ---
 
@@ -101,4 +104,4 @@ CI runs for these checkpoints are pending push access (see verification docs).
 | M6 Phase 4 | Disk-loaded assets + Lambert lighting — **complete (local verify; CI pending)** |
 | M7 Phase 5 | Fly camera + interpolated fixed-step loop — **complete (local verify; CI pending)** |
 | M8 Phase 6 | Debug draw + multi-window proof — **complete (local verify; CI pending)** |
-| M9 | Phase 7 polish + packaging → M-final |
+| M9 / M-final | Phase 7 polish + packaging — **complete (local verify incl. packaged-binary run; CI pending)** |
