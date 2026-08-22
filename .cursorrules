@@ -289,7 +289,7 @@ Frozen interfaces:
   draws `interpolate(e.previousTransform, e.transform, timer.alpha())` with
   `controller.writeToCamera(timer.alpha())` before `setViewProjection`.
 
-### Phase 6 — Tooling / editor hooks (CURRENT)
+### Phase 6 — Tooling / editor hooks (DONE)
 
 Frozen interfaces:
 

@@ -12,6 +12,7 @@ Phase tracker for the custom C++17 / OpenGL engine (4.6 core preferred,
 - [`VERIFICATION_2026-08-22-p3.md`](./VERIFICATION_2026-08-22-p3.md) — M5 Phase 3 scene + transforms
 - [`VERIFICATION_2026-08-22-p4.md`](./VERIFICATION_2026-08-22-p4.md) — M6 Phase 4 assets
 - [`VERIFICATION_2026-08-22-p5.md`](./VERIFICATION_2026-08-22-p5.md) — M7 Phase 5 gameplay loop
+- [`VERIFICATION_2026-08-22-p6.md`](./VERIFICATION_2026-08-22-p6.md) — M8 Phase 6 tooling
 
 Update checkboxes when a module lands. Add a new `VERIFICATION_YYYY-MM-DD.md`
 after each meaningful checkpoint.
@@ -76,9 +77,10 @@ CI runs for these checkpoints are pending push access (see verification docs).
       `game/Spinner`; snapshot + blend interpolation via `Timer::alpha()` and
       `interpolate()`; drain loop wired in `main.cpp`)
 
-## Phase 6 — Tooling / editor hooks
+## Phase 6 — Tooling / editor hooks (DONE)
 
-- [ ] Multi-window / debug draw
+- [x] Multi-window / debug draw (`renderer/DebugDraw` line batcher on F1;
+      `JADE_SECOND_WINDOW=1` proof + `Window::makeCurrent`)
 
 ## Phase 7 — Polish + packaging
 
@@ -98,4 +100,5 @@ CI runs for these checkpoints are pending push access (see verification docs).
 | M5 Phase 3 | Transform + flat scene + model-matrix draw — **complete (local verify; CI pending)** |
 | M6 Phase 4 | Disk-loaded assets + Lambert lighting — **complete (local verify; CI pending)** |
 | M7 Phase 5 | Fly camera + interpolated fixed-step loop — **complete (local verify; CI pending)** |
-| M8+ | Open Phase 6+ sections in `.cursorrules` as they start |
+| M8 Phase 6 | Debug draw + multi-window proof — **complete (local verify; CI pending)** |
+| M9 | Phase 7 polish + packaging → M-final |

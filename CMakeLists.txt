@@ -70,6 +70,7 @@ add_executable(jade
     game/Spinner.cpp
     math/Transform.cpp
     renderer/Camera.cpp
+    renderer/DebugDraw.cpp
     renderer/Mesh.cpp
     renderer/Renderer.cpp
     renderer/Shader.cpp

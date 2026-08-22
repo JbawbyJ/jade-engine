@@ -20,6 +20,7 @@
 #include "game/Spinner.h"
 #include "math/Transform.h"
 #include "renderer/Camera.h"
+#include "renderer/DebugDraw.h"
 #include "renderer/Mesh.h"
 #include "renderer/Renderer.h"
 #include "renderer/Shader.h"
@@ -54,9 +55,10 @@ int main() {
             JADE_LOG_INFO("Second window destroyed; primary context restored");
         }
 
-        Timer    timer;
-        Input    input(window.native());
-        Renderer renderer;
+        Timer     timer;
+        Input     input(window.native());
+        Renderer  renderer;
+        DebugDraw debugDraw; // F1 toggles the grid + axes overlay
 
         // Everything below loads from disk — Phase 4's whole point. The
         // unique_ptrs are declared after Window so all GL objects die before
@@ -126,6 +128,8 @@ int main() {
         spinner.add(spinCenter);
         spinner.add(spinRight);
 
+        bool showDebugDraw = false;
+
         JADE_LOG_INFO("Jade Engine initialized");
 
         // Optional frame cap for headless / CI runs: JADE_MAX_FRAMES=N requests
@@ -152,6 +156,9 @@ int main() {
             // inside one frame still registers, so a quick ESC tap always quits.
             if (input.wasKeyPressed(Key::Escape)) {
                 window.requestClose();
+            }
+            if (input.wasKeyPressed(Key::F1)) {
+                showDebugDraw = !showDebugDraw;
             }
 
             // Bank this frame's look delta before the drain — mouseDelta()
@@ -181,6 +188,17 @@ int main() {
                 renderer.draw(*entity.mesh, *shader, *entity.texture,
                               interpolate(entity.previousTransform,
                                           entity.transform, alpha));
+            }
+
+            if (showDebugDraw) {
+                debugDraw.grid(3.0f, 0.5f, {0.35f, 0.35f, 0.40f});
+                for (const Entity& entity : scene.entities()) {
+                    // Sim-state axes (not interpolated): at demo rates they
+                    // trail the blended mesh by under one fixed step — fine
+                    // for a debug gizmo, and it shows the raw simulation.
+                    debugDraw.axes(entity.transform, 0.5f);
+                }
+                debugDraw.flush(camera.viewProjection());
             }
 
             window.swapBuffers();
