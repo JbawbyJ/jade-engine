@@ -29,7 +29,7 @@
 | Renderer draws at least one mesh with a shader | Pass | Colored triangle; 1x1 white texture sampled. Shader/mesh/texture construct before the init log |
 | ESC quits; clean shutdown log | Pass (source) | `input.isKeyDown(Key::Escape)`; existing shutdown lines. Headless `timeout` cannot press ESC |
 | Zero-warning build | Pass | `cmake --build build` with `-Wall -Wextra -Wpedantic`, g++ 13.3, zero warnings |
-| Ubuntu+Windows smoke CI | Pending runner | No new apt packages; glm is header-only |
+| Ubuntu+Windows smoke CI | Pass | [Actions run 32595324175](https://github.com/JbawbyJ/jade-engine/actions/runs/32595324175) — `smoke (ubuntu)` and `smoke (windows)` both green. glm header-only; no new apt packages |
 | Every GL call uses `GL_CHECK` | Pass | Shader / Mesh / Texture / Renderer |
 
 ## Texture honesty
@@ -60,3 +60,9 @@ Observed (then `timeout` SIGTERM, exit 124):
 - No `ShaderError`, no `GL_CHECK` `ERROR` lines after context creation
 
 Draw pixels are not asserted under llvmpipe (no GPU screenshot gate). The GL path executed without error.
+
+## CI
+
+Commit `cc23250` on `cursor/m2-first-triangle-50ca`: both smoke jobs succeeded
+(Ubuntu Ninja Release + Windows MSVC Release). That is the compile gate for
+this slice; the runner does not open a window.
