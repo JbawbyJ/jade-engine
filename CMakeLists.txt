@@ -40,6 +40,19 @@ endif()
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glm   CONFIG REQUIRED)
 
+# Phase 4 asset dependencies. tinyobjloader exports the same CONFIG target
+# from vcpkg and from system packages. stb is header-only with two layouts:
+# vcpkg ships a find module (Stb_INCLUDE_DIR, headers unprefixed), Ubuntu
+# installs under /usr/include/stb — find_path with the suffix covers both.
+find_package(tinyobjloader CONFIG REQUIRED)
+find_package(Stb QUIET)
+if(NOT Stb_INCLUDE_DIR)
+    find_path(Stb_INCLUDE_DIR stb_image.h PATH_SUFFIXES stb)
+endif()
+if(NOT Stb_INCLUDE_DIR)
+    message(FATAL_ERROR "stb_image.h not found (vcpkg port 'stb' or system libstb-dev)")
+endif()
+
 # --- Engine executable ------------------------------------------------------
 # As we add modules in Phase 1, append their .cpp files here.
 add_executable(jade
@@ -67,11 +80,22 @@ target_include_directories(jade PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # GLFW_INCLUDE_NONE the glad-before-GLFW include-order trap cannot fire.
 target_compile_definitions(jade PRIVATE GLFW_INCLUDE_NONE)
 
+target_include_directories(jade SYSTEM PRIVATE ${Stb_INCLUDE_DIR})
+
 target_link_libraries(jade PRIVATE
     glfw
     glad::glad
     glm::glm
+    tinyobjloader::tinyobjloader
 )
+
+# Runtime assets live next to the binary so exe-relative resolution works the
+# same from a dev tree, CI, and an unpacked release.
+add_custom_command(TARGET jade POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+            "$<TARGET_FILE_DIR:jade>/assets"
+    COMMENT "Copying assets next to the jade binary")
 
 # Strict warnings on day one. Future bugs hide behind warnings; we kill them now.
 # Shared via an interface target so every engine target (jade, jade_tests)
