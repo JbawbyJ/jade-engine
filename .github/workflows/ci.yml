@@ -105,6 +105,19 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure -C Release
 
+      - name: Package
+        shell: bash
+        run: cd build && cpack
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: jade-${{ matrix.name }}
+          path: |
+            build/jade-engine-*.zip
+            build/jade-engine-*.tar.gz
+          if-no-files-found: error
+
       - name: Headless run gate
         if: runner.os == 'Linux'
         shell: bash

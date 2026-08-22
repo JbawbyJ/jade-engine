@@ -13,7 +13,7 @@ if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
         CACHE STRING "vcpkg toolchain file")
 endif()
 
-project(JadeEngine LANGUAGES CXX)
+project(JadeEngine VERSION 0.1.0 LANGUAGES CXX)
 
 # C++17, no compiler extensions, standard is required (not "preferred").
 set(CMAKE_CXX_STANDARD 17)
@@ -85,7 +85,10 @@ target_include_directories(jade PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # GLFW must never drag system GL headers in behind glad's back; with
 # GLFW_INCLUDE_NONE the glad-before-GLFW include-order trap cannot fire.
-target_compile_definitions(jade PRIVATE GLFW_INCLUDE_NONE)
+# JADE_VERSION feeds the startup log from the one authoritative version.
+target_compile_definitions(jade PRIVATE
+    GLFW_INCLUDE_NONE
+    JADE_VERSION="${PROJECT_VERSION}")
 
 target_include_directories(jade SYSTEM PRIVATE ${Stb_INCLUDE_DIR})
 
@@ -112,6 +115,24 @@ add_custom_target(jade_assets ALL
             "${CMAKE_CURRENT_SOURCE_DIR}/assets/textures" "$<TARGET_FILE_DIR:jade>/assets/textures"
     COMMENT "Syncing content dirs next to the jade binary")
 add_dependencies(jade_assets jade)
+
+# --- Packaging (Phase 7) ----------------------------------------------------
+# One flat package: the binary at the root with assets/ beside it, exactly
+# the layout exe-relative resolution expects. Content dirs only — loader
+# sources stay out of the package for the same reason they stay out of the
+# build dir. ZIP on Windows, TGZ elsewhere; `cmake --build build --target
+# package` (or cpack) produces jade-engine-<version>-<system>.<ext>.
+install(TARGETS jade RUNTIME DESTINATION .)
+install(DIRECTORY assets/meshes assets/shaders assets/textures DESTINATION assets)
+set(CPACK_PACKAGE_NAME "jade-engine")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_FILE_NAME "jade-engine-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}")
+if(WIN32)
+    set(CPACK_GENERATOR "ZIP")
+else()
+    set(CPACK_GENERATOR "TGZ")
+endif()
+include(CPack)
 
 # Strict warnings on day one. Future bugs hide behind warnings; we kill them now.
 # Shared via an interface target so every engine target (jade, jade_tests)

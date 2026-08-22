@@ -318,10 +318,17 @@ Frozen interfaces:
   Explicitly NOT an editor shell.
 - Log file sink already landed in Phase 2 (did not slip).
 
-### Phase 7 — Polish + packaging
+### Phase 7 — Polish + packaging (CURRENT)
 
-- Release build config, asset packaging, README for end users.
-- Performance passes only with a profiler, not guesswork.
+- `project(... VERSION 0.1.0)`; `JADE_VERSION` compile definition feeds the
+  startup log from the single authoritative version.
+- CPack: flat package (binary at root + content-only `assets/` beside it —
+  the exact exe-relative layout), ZIP on Windows / TGZ elsewhere; CI runs
+  cpack per leg and uploads `jade-<os>` artifacts on every green run.
+- README rewritten for demo users first (controls, download-and-run), then
+  build-from-source, third-party notices incl. stb/tinyobjloader/doctest.
+- Performance note (honest, per the original rule): not profiled; no known
+  hotspots at demo scale. Perf passes only with a profiler, not guesswork.
 
 Phases 2–7 are intentionally thinner than Phase 1. Expand a phase's section in
 this file when that phase becomes current — do not invent APIs ahead of time.

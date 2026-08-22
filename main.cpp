@@ -130,6 +130,9 @@ int main() {
 
         bool showDebugDraw = false;
 
+#if defined(JADE_VERSION)
+        JADE_LOG_INFO("Jade Engine version " JADE_VERSION);
+#endif
         JADE_LOG_INFO("Jade Engine initialized");
 
         // Optional frame cap for headless / CI runs: JADE_MAX_FRAMES=N requests
