@@ -190,6 +190,10 @@ void Window::requestClose() {
     glfwSetWindowShouldClose(m_window, GLFW_TRUE);
 }
 
+void Window::makeCurrent() const {
+    glfwMakeContextCurrent(m_window);
+}
+
 void Window::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
     // Recover our Window* from the user pointer set in the constructor.
     auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));

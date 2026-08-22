@@ -52,6 +52,12 @@ public:
     bool shouldClose() const;  // true once the user clicks X or we request close
     void requestClose();       // ask the loop to exit on the next iteration
 
+    // Make this window's GL context current on the calling thread. The
+    // constructor leaves the NEW window's context current, so after creating
+    // and destroying a secondary window the primary must be restored — this
+    // is that restore. (Destroying the current context leaves none current.)
+    void makeCurrent() const;
+
     // Window size in screen coordinates (logical units on Hi-DPI).
     int width()  const { return m_width;  }
     int height() const { return m_height; }

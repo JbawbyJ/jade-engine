@@ -289,10 +289,34 @@ Frozen interfaces:
   draws `interpolate(e.previousTransform, e.transform, timer.alpha())` with
   `controller.writeToCamera(timer.alpha())` before `setViewProjection`.
 
-### Phase 6 — Tooling / editor hooks
+### Phase 6 — Tooling / editor hooks (CURRENT)
 
-- Multi-window support (Window already refcounts GLFW for this).
-- Debug draw / gizmos.
+Frozen interfaces:
+
+- NEW `renderer/DebugDraw.h/.cpp`: immediate-mode line batcher.
+  `class DebugDraw` — ctor creates its own VAO/VBO and compiles a minimal
+  embedded position+color line shader (embedded is CORRECT here: it is
+  engine-internal tooling, not content); non-copyable/non-movable.
+  `void line(const Vec3& a, const Vec3& b, const Vec3& color);`
+  `void grid(float extent, float step, const Vec3& color);` — XZ plane at
+  y = 0, lines every `step` from -extent to +extent in both axes.
+  `void axes(const Transform& t, float length);` — the transform's local
+  X/Y/Z as red/green/blue segments from its position.
+  `void flush(const Mat4& viewProj);` — uploads the batch
+  (`GL_DYNAMIC_DRAW`, orphaned by respecifying per flush), draws GL_LINES,
+  clears the batch. Every GL call in GL_CHECK. Vertex layout private to the
+  batcher (location 0 = position, 1 = color).
+- `Window` gains `void makeCurrent() const;` — the constructor documents
+  that it leaves the NEW window's context current; the second-window proof
+  needs to restore the primary context afterwards (coordinator).
+- Demo: `Key::F1` toggles debug draw (grid extent 3.0 step 0.5 + per-entity
+  axes, flushed after the lit pass with the same view-projection).
+- Second-window proof (coordinator, `main.cpp`): `JADE_SECOND_WINDOW=1`
+  constructs a second `Window`, logs its negotiated context, destroys it
+  before the loop, then restores the primary context via `makeCurrent()` —
+  exercising the GLFW refcount and the context save/restore hygiene fixes.
+  Explicitly NOT an editor shell.
+- Log file sink already landed in Phase 2 (did not slip).
 
 ### Phase 7 — Polish + packaging
 

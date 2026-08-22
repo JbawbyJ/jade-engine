@@ -37,6 +37,23 @@ int main() {
         Camera camera;
 
         Window   window(WindowProps{"Jade Engine", 1280, 720});
+
+        // Multi-window proof (Phase 6): JADE_SECOND_WINDOW=1 constructs and
+        // destroys a second window before any GL resources exist, exercising
+        // the GLFW refcount and the context-restore hygiene. Explicitly not
+        // an editor shell. The second constructor leaves ITS context current
+        // (and reloads glad's process-global pointers from it); destroying it
+        // leaves none current, so the primary is restored right after.
+        if (const char* secondFlag = std::getenv("JADE_SECOND_WINDOW");
+            secondFlag != nullptr && secondFlag[0] == '1') {
+            {
+                Window second(WindowProps{"Jade Engine (second)", 320, 240});
+                JADE_LOG_INFO("Second window constructed; destroying it again");
+            }
+            window.makeCurrent();
+            JADE_LOG_INFO("Second window destroyed; primary context restored");
+        }
+
         Timer    timer;
         Input    input(window.native());
         Renderer renderer;
