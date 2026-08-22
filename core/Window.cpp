@@ -141,6 +141,15 @@ Window::Window(const WindowProps& props)
                       + " | GPU: "
                       + glStringOrUnknown(GL_RENDERER));
 
+        // Push-based GL diagnostics (KHR_debug / core 4.3+): the driver calls
+        // us the moment it records a problem, like an event listener replacing
+        // a polling loop. GL_CHECK stays on every call as the 3.3-path fallback.
+        if (installGlDebugCallback()) {
+            JADE_LOG_INFO("KHR_debug active: push-based GL diagnostics");
+        } else {
+            JADE_LOG_INFO("KHR_debug unavailable: GL_CHECK polling only");
+        }
+
         // Hi-DPI (e.g. Retina) decouples window size from framebuffer size.
         glfwGetWindowSize(m_window, &m_width, &m_height);
         glfwGetFramebufferSize(m_window, &m_framebufferWidth, &m_framebufferHeight);

@@ -44,10 +44,12 @@ find_package(glm   CONFIG REQUIRED)
 # As we add modules in Phase 1, append their .cpp files here.
 add_executable(jade
     main.cpp
+    core/GLDebug.cpp
     core/Input.cpp
     core/Logger.cpp
     core/Timer.cpp
     core/Window.cpp
+    renderer/Camera.cpp
     renderer/Mesh.cpp
     renderer/Renderer.cpp
     renderer/Shader.cpp
@@ -102,7 +104,9 @@ if(JADE_BUILD_TESTS)
         tests/TestMain.cpp
         tests/TimerTests.cpp
         tests/MathTests.cpp
+        tests/CameraTests.cpp
         core/Timer.cpp
+        renderer/Camera.cpp
     )
     target_include_directories(jade_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(jade_tests PRIVATE doctest::doctest glm::glm jade_warnings)

@@ -10,6 +10,7 @@
 #include "core/Logger.h"
 #include "core/Timer.h"
 #include "core/Window.h"
+#include "renderer/Camera.h"
 #include "renderer/Mesh.h"
 #include "renderer/Renderer.h"
 #include "renderer/Shader.h"
@@ -25,13 +26,15 @@ layout (location = 0) in vec3 aPosition;
 layout (location = 1) in vec3 aColor;
 layout (location = 2) in vec2 aTexCoord;
 
+uniform mat4 uViewProj;
+
 out vec3 vColor;
 out vec2 vTexCoord;
 
 void main() {
     vColor = aColor;
     vTexCoord = aTexCoord;
-    gl_Position = vec4(aPosition, 1.0);
+    gl_Position = uViewProj * vec4(aPosition, 1.0);
 }
 )";
 
@@ -74,6 +77,18 @@ int main() {
         const unsigned char kWhiteRgba[] = {255, 255, 255, 255};
         Texture white(1, 1, kWhiteRgba);
 
+        // Static camera two units back on +Z, looking at the triangle. The
+        // Phase 5 controller will fly it; for now only the aspect tracks the
+        // framebuffer so resizing never stretches the scene.
+        Camera camera;
+        camera.setAspect(static_cast<float>(window.framebufferWidth())
+                         / static_cast<float>(window.framebufferHeight()));
+        window.setResizeCallback([&camera](int width, int height) {
+            if (height > 0) {
+                camera.setAspect(static_cast<float>(width) / static_cast<float>(height));
+            }
+        });
+
         JADE_LOG_INFO("Jade Engine initialized");
 
         // Optional frame cap for headless / CI runs: JADE_MAX_FRAMES=N requests
@@ -104,6 +119,7 @@ int main() {
                 // TODO(jade): Phase 5 gameplay systems consume the fixed step
             }
 
+            renderer.setViewProjection(camera.viewProjection());
             renderer.beginFrame();
             renderer.draw(triangle, shader, white);
 
