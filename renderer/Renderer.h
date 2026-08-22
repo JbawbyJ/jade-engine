@@ -23,12 +23,19 @@ public:
     Renderer& operator=(Renderer&&) = delete;
 
     void setClearColor(const Vec4& color);
+
+    // Cache the camera's combined view-projection for this frame; draw()
+    // uploads it as `uViewProj`. Defaults to identity so Phase 1-style
+    // clip-space shaders keep working unchanged.
+    void setViewProjection(const Mat4& viewProjection);
+
     void beginFrame() const;
     void draw(const Mesh& mesh, const Shader& shader) const;
     void draw(const Mesh& mesh, const Shader& shader, const Texture& texture) const;
 
 private:
     Vec4 m_clearColor{0.10f, 0.10f, 0.12f, 1.0f};
+    Mat4 m_viewProjection{1.0f};
 };
 
 } // namespace jade
