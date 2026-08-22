@@ -137,12 +137,18 @@ int main() {
                 window.requestClose();
             }
 
-            // Snapshot BEFORE the drain: rendering blends the two most recent
-            // simulation states by alpha, the classic fixed-update /
-            // interpolated-render split this loop was built for.
-            scene.snapshotPrevious();
-            controller.snapshotPrevious();
+            // Bank this frame's look delta before the drain — mouseDelta()
+            // is overwritten next update(), so zero-step frames must not
+            // drop it (sensitivity would scale with framerate).
+            controller.collectLook(input);
+
+            // Snapshot inside the drain, per CONSUMED step: previous/current
+            // must be the two most recent real simulation states. A per-frame
+            // snapshot collapses them on zero-step frames and interpolation
+            // degenerates into a 60 Hz stair-step (Phase 5 review finding).
             while (timer.consumeFixedStep()) {
+                scene.snapshotPrevious();
+                controller.snapshotPrevious();
                 controller.fixedUpdate(input, timer.fixedDelta());
                 spinner.fixedUpdate(scene, timer.fixedDelta());
             }

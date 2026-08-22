@@ -20,14 +20,22 @@ public:
     // position/yaw/pitch, so construction never teleports the view.
     explicit CameraController(Camera& camera);
 
-    // previous ← current. Call once per render frame, alongside
-    // Scene::snapshotPrevious(), BEFORE the fixed-step drain. Also re-arms
-    // the once-per-frame mouse-look latch (see fixedUpdate).
+    // Bank this render frame's mouse-look delta (pixels, while the right
+    // button is held). Call once per frame right after Input::update():
+    // mouseDelta() covers exactly one frame and is overwritten by the next
+    // update(), so un-banked motion on a frame that runs zero fixed steps
+    // would be lost forever — banking defers it to the next step instead.
+    void collectLook(const Input& input);
+
+    // previous ← current. Call once per CONSUMED fixed step, inside the
+    // drain, before fixedUpdate — never once per render frame: a per-frame
+    // snapshot collapses previous onto current on zero-step frames and turns
+    // interpolation into a 60 Hz stair-step (found by the Phase 5 review).
     void snapshotPrevious();
 
     // One fixed simulation step: WASD moves in the horizontal plane relative
-    // to yaw only, Space/LeftShift move straight up/down, and holding the
-    // right mouse button turns the view with the mouse.
+    // to yaw only, Space/LeftShift move straight up/down, and the banked
+    // look delta (collectLook) is consumed in full by exactly one step.
     void fixedUpdate(const Input& input, float dt);
 
     // Writes lerp(previous, current, alpha) into the stored Camera —
@@ -51,13 +59,10 @@ private:
     float m_previousYaw{0.0f};
     float m_previousPitch{0.0f};
 
-    // Mouse look is applied by at most ONE fixed step per render frame.
-    // Input::mouseDelta() reports pixels since the last Input::update() —
-    // a per-render-frame quantity — so consuming it in every banked step of
-    // a catch-up frame would multiply the turn by the step count (a hitch
-    // would whip the view around). snapshotPrevious() clears this latch;
-    // the first fixedUpdate afterwards sets it and applies the look.
-    bool m_lookAppliedThisFrame{false};
+    // Pixels of look input banked by collectLook() and not yet consumed.
+    // Consumed (and zeroed) by exactly one fixed step, so a catch-up frame
+    // cannot multiply the turn and a zero-step frame cannot lose it.
+    Vec2 m_pendingLook{0.0f, 0.0f};
 };
 
 } // namespace jade

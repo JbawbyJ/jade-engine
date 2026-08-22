@@ -39,7 +39,10 @@ on the current Phase 1 checklist in `docs/ROADMAP.md`.
    for programmer invariants. Recoverable init failures throw (`WindowError`)
    or use `JADE_LOG_ERROR` and a graceful path.
 8. Every OpenGL call wraps in `GL_CHECK(...)` from day one (`core/GLDebug.h`).
-9. New `.cpp` files are added to `CMakeLists.txt` in the same commit.
+9. New `.cpp` files are added to `CMakeLists.txt` in the same commit — or,
+   in a multi-module wave where a module lands before its integration
+   commit, the deferral is disclosed in the landing commit's message and the
+   wiring lands in the same wave.
 10. Platform differences go behind `#if defined(_WIN32)` / `#else` (see Logger).
 11. Comments may use short web-dev analogies when they clarify intent
     (e.g. resize callback ≈ JS event emitter). Keep them tight.
@@ -255,13 +258,18 @@ Frozen interfaces:
   Documented limitation: per-component Euler blending, fine at demo rates.
 - `scene/Entity.h`: gains `Transform previousTransform;` (coordinator).
   `Scene::snapshotPrevious()` copies current→previous for every entity;
-  called once per render frame BEFORE the fixed-step drain (coordinator).
+  called once per CONSUMED fixed step, inside the drain, before the systems
+  run. (Corrected after the phase review: the original per-render-frame
+  placement collapsed previous onto current on zero-step frames, reducing
+  interpolation to a 60 Hz stair-step at high refresh rates.)
 - `core/Input`: `MousePosition mouseDelta() const` — pixels moved since the
   previous `update()`; zero on the first frame. `Key::F1 = 290` added.
 - `game/CameraController.h/.cpp`: owns the authoritative fly pose
   (position/yaw/pitch + previous copies, seeded from the Camera at
   construction). `explicit CameraController(Camera& camera);`
-  `void snapshotPrevious();` (call with the scene snapshot);
+  `void collectLook(const Input&);` (once per render frame after
+  Input::update() — banks the frame's look delta so zero-step frames cannot
+  drop it); `void snapshotPrevious();` (per consumed step, with the scene's);
   `void fixedUpdate(const Input& input, float dt);` — WASD planar relative to
   yaw, Space up / LeftShift down (`kMoveSpeed` 2.5 u/s); look while the right
   mouse button is held via `mouseDelta()` (`kLookSpeed` 0.0035 rad/px), pitch

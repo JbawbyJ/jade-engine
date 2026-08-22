@@ -5,6 +5,7 @@
 #include "game/CameraController.h"
 
 #include "core/Input.h"
+#include "math/Transform.h" // lerpAngleShortest — one definition, shared
 #include "renderer/Camera.h"
 
 #include <algorithm>
@@ -16,13 +17,10 @@ namespace {
 
 constexpr float kTwoPi = 6.28318530717958647692f;
 
-// Shortest-arc angle blend — same idiom as math/Transform.cpp:
-// std::remainder(x, 2*pi) wraps the difference into [-pi, pi], so a yaw
-// tween from +179° to -179° swings 2° through 180°, not 358° the long way.
-float lerpAngleShortest(float from, float to, float alpha) {
-    const float diff = std::remainder(to - from, kTwoPi);
-    return from + alpha * diff;
-}
+// Below this, planar input is treated as "no keys": opposing keys cancel to
+// rounding noise, and normalizing that noise would inflate it to full-speed
+// drift. The epsilon keeps correctness independent of evaluation order.
+constexpr float kPlanarDeadzone = 1e-4f;
 
 } // namespace
 
@@ -35,29 +33,37 @@ CameraController::CameraController(Camera& camera)
       m_previousYaw(m_yaw),
       m_previousPitch(m_pitch) {}
 
+void CameraController::collectLook(const Input& input) {
+    // TODO(jade): capture the cursor (GLFW_CURSOR_DISABLED + raw motion via
+    //             Window) so a long drag cannot stall at the screen edge.
+    if (input.isMouseButtonDown(Mouse::Right)) {
+        const MousePosition delta = input.mouseDelta();
+        m_pendingLook.x += static_cast<float>(delta.x);
+        m_pendingLook.y += static_cast<float>(delta.y);
+    }
+}
+
 void CameraController::snapshotPrevious() {
     m_previousPosition = m_position;
     m_previousYaw = m_yaw;
     m_previousPitch = m_pitch;
-    m_lookAppliedThisFrame = false;
 }
 
 void CameraController::fixedUpdate(const Input& input, float dt) {
-    // --- Look (latched: once per render frame, not once per fixed step) ---
-    // mouseDelta() is pixels since the previous Input::update(), i.e. a
-    // per-render-frame delta. Applying it in every banked catch-up step
-    // would double/triple the turn on hitches, so only the first step after
-    // snapshotPrevious() consumes it. Look runs before movement so this
-    // step's WASD travels along the fresh heading.
-    if (!m_lookAppliedThisFrame) {
-        m_lookAppliedThisFrame = true;
-        if (input.isMouseButtonDown(Mouse::Right)) {
-            const MousePosition delta = input.mouseDelta();
-            m_yaw += static_cast<float>(delta.x) * kLookSpeed;
-            // Screen y grows downward, so dragging up (negative dy) looks up.
-            m_pitch -= static_cast<float>(delta.y) * kLookSpeed;
-            m_pitch = std::clamp(m_pitch, -kMaxPitch, kMaxPitch);
-        }
+    // --- Look: consume the banked per-frame delta exactly once ---
+    // The bank zeroes on consumption, so a catch-up frame's extra steps add
+    // nothing, and motion banked on zero-step frames waits here instead of
+    // evaporating (mouse sensitivity must not scale with framerate). Look
+    // runs before movement so this step's WASD travels the fresh heading.
+    if (m_pendingLook.x != 0.0f || m_pendingLook.y != 0.0f) {
+        m_yaw += m_pendingLook.x * kLookSpeed;
+        // Screen y grows downward, so dragging up (negative dy) looks up.
+        m_pitch -= m_pendingLook.y * kLookSpeed;
+        m_pitch = std::clamp(m_pitch, -kMaxPitch, kMaxPitch);
+        // Wrap like the Spinner: unbounded yaw degrades float precision over
+        // long sessions, and shortest-arc blending hides the ±pi seam.
+        m_yaw = std::remainder(m_yaw, kTwoPi);
+        m_pendingLook = {0.0f, 0.0f};
     }
 
     // --- Movement ---
@@ -75,11 +81,12 @@ void CameraController::fixedUpdate(const Input& input, float dt) {
     if (input.isKeyDown(Key::A)) { planar -= right; }
 
     // Normalize combined directions so W+D is not sqrt(2) faster than W —
-    // the classic strafe-running exploit. Opposing keys cancel to ~zero
-    // length, which the guard treats as "no input".
+    // the classic strafe-running exploit. Opposing keys cancel to rounding
+    // noise; the deadzone treats that as "no input" instead of normalizing
+    // noise up to full speed.
     const float planarLength =
         std::sqrt(planar.x * planar.x + planar.z * planar.z);
-    if (planarLength > 0.0f) {
+    if (planarLength > kPlanarDeadzone) {
         m_position += planar * (kMoveSpeed * dt / planarLength);
     }
 

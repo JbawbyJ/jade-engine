@@ -31,4 +31,9 @@ struct Transform {
 // demo rates the per-step angle deltas are tiny, so this is indistinguishable.
 Mat4 interpolate(const Transform& from, const Transform& to, float alpha);
 
+// Blend one angle along the SHORTEST arc: the difference wraps into [-pi, pi]
+// (IEEE-exact std::remainder) before from + alpha * diff. Shared by pose
+// interpolation and the fly camera so the idiom has exactly one definition.
+float lerpAngleShortest(float from, float to, float alpha);
+
 } // namespace jade

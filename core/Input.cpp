@@ -122,8 +122,11 @@ bool Input::wasKeyReleased(int key) const {
 }
 
 bool Input::isMouseButtonDown(int button) const {
+    // Snapshot, not a live poll: every button is re-polled by update(), so
+    // answering from the snapshot keeps all queries in a frame coherent
+    // (matching tracked-key isKeyDown) and preserves sticky taps.
     if (!validButton(button)) return false;
-    return glfwGetMouseButton(m_window, button) == GLFW_PRESS;
+    return m_buttonsDown[static_cast<std::size_t>(button)];
 }
 
 bool Input::wasMouseButtonPressed(int button) const {

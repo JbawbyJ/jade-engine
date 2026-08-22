@@ -22,6 +22,8 @@ namespace {
 
 constexpr float kTwoPi = 6.28318530717958647692f;
 
+} // namespace
+
 // Shortest-arc blend of one angle: wrap the difference into [-pi, pi], then
 // walk that far from `from`. std::remainder(x, 2*pi) is exactly that wrap —
 // it returns x minus the nearest multiple of 2*pi. Same trick as normalizing
@@ -30,8 +32,6 @@ float lerpAngleShortest(float from, float to, float alpha) {
     const float diff = std::remainder(to - from, kTwoPi);
     return from + alpha * diff;
 }
-
-} // namespace
 
 Mat4 interpolate(const Transform& from, const Transform& to, float alpha) {
     // Build the blended pose, then reuse Transform::matrix() so the compose
