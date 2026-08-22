@@ -16,6 +16,7 @@ namespace {
         Key::S,
         Key::W,
         Key::Escape,
+        Key::F1,
         Key::LeftShift,
         Key::LeftCtrl,
         Key::LeftAlt,
@@ -35,6 +36,13 @@ Input::Input(GLFWwindow* window)
     for (int key : kDefaultTrackedKeys) {
         m_keyTracked[static_cast<std::size_t>(key)] = true;
     }
+
+    // Seed both cursor snapshots from the live position so the first
+    // update() yields a ~zero mouseDelta(). Without this, "last" would start
+    // at {0,0} and frame one would report the cursor's absolute coordinates
+    // as movement — a synthetic delta big enough to spin the Phase 5 camera.
+    glfwGetCursorPos(m_window, &m_mousePosition.x, &m_mousePosition.y);
+    m_mousePositionLast = m_mousePosition;
 }
 
 void Input::update() {
@@ -53,6 +61,11 @@ void Input::update() {
         m_buttonsDown[i] =
             glfwGetMouseButton(m_window, static_cast<int>(i)) == GLFW_PRESS;
     }
+
+    // Cursor: shift current → last, then refresh current. mousePosition()
+    // serves the cached snapshot; mouseDelta() is current − last.
+    m_mousePositionLast = m_mousePosition;
+    glfwGetCursorPos(m_window, &m_mousePosition.x, &m_mousePosition.y);
 }
 
 bool Input::validKey(int key) const {
@@ -126,9 +139,17 @@ bool Input::wasMouseButtonReleased(int button) const {
 }
 
 MousePosition Input::mousePosition() const {
-    MousePosition pos{};
-    glfwGetCursorPos(m_window, &pos.x, &pos.y);
-    return pos;
+    // Snapshot from the latest update(), not a live glfwGetCursorPos poll —
+    // frame-coherent with mouseDelta() and with the tracked-key isKeyDown
+    // philosophy: every query inside one frame agrees.
+    return m_mousePosition;
+}
+
+MousePosition Input::mouseDelta() const {
+    // Pixels moved between the previous update() and the latest one. Zero on
+    // the first frame (constructor seeds last = current).
+    return {m_mousePosition.x - m_mousePositionLast.x,
+            m_mousePosition.y - m_mousePositionLast.y};
 }
 
 } // namespace jade

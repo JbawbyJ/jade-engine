@@ -21,6 +21,7 @@ namespace Key {
     constexpr int S          = 83;
     constexpr int W          = 87;
     constexpr int Escape     = 256;
+    constexpr int F1         = 290; // Phase 6 binding target (== GLFW_KEY_F1)
     constexpr int LeftShift  = 340;
     constexpr int LeftCtrl   = 341;
     constexpr int LeftAlt    = 342;
@@ -64,7 +65,17 @@ public:
     bool wasMouseButtonPressed(int button) const;
     bool wasMouseButtonReleased(int button) const;
 
+    // Cursor position as of the last update() — a frame-coherent snapshot,
+    // not a live poll (changed from live glfwGetCursorPos when mouseDelta
+    // landed), matching the tracked-key isKeyDown philosophy: every query
+    // inside one frame sees the same value.
     MousePosition mousePosition() const;
+
+    // Pixels the cursor moved since the previous update() (current − last).
+    // Zero on the first frame: the constructor seeds both snapshots from the
+    // live cursor, so a huge synthetic first-frame delta cannot spin the
+    // Phase 5 camera controller.
+    MousePosition mouseDelta() const;
 
 private:
     static constexpr std::size_t kKeyCount    = 512; // covers GLFW_KEY_LAST (348)
@@ -94,6 +105,11 @@ private:
     mutable bool m_keysDownLast[kKeyCount]{};
     bool m_buttonsDown[kButtonCount]{};
     bool m_buttonsDownLast[kButtonCount]{};
+
+    // Cursor snapshots: current as of the latest update(), last as of the
+    // update() before it. Seeded equal in the constructor (zero first delta).
+    MousePosition m_mousePosition{};
+    MousePosition m_mousePositionLast{};
 };
 
 } // namespace jade
