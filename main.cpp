@@ -2,11 +2,15 @@
 // Phase 3 demo: fixed camera over a flat scene of transformed entities,
 // drawn each variable frame while the fixed-step drain awaits Phase 5.
 
-#include <cstdint>
 #include <cstdlib>
 #include <exception>
+#include <memory>
 #include <string>
 
+#include "assets/AssetError.h"
+#include "assets/MeshLoader.h"
+#include "assets/ShaderLoader.h"
+#include "assets/TextureLoader.h"
 #include "core/Input.h"
 #include "core/Logger.h"
 #include "core/Timer.h"
@@ -18,55 +22,6 @@
 #include "renderer/Shader.h"
 #include "renderer/Texture.h"
 #include "scene/Scene.h"
-
-namespace {
-
-// #version 330 core so the demo compiles on the 3.3 fallback path as well
-// as 4.x. Embedded (not files) so CI does not need an assets copy step.
-constexpr const char* kTriangleVertexSrc = R"(
-#version 330 core
-layout (location = 0) in vec3 aPosition;
-layout (location = 1) in vec3 aNormal;
-layout (location = 2) in vec3 aColor;
-layout (location = 3) in vec2 aTexCoord;
-
-uniform mat4 uViewProj;
-uniform mat4 uModel;
-
-out vec3 vNormal;
-out vec3 vColor;
-out vec2 vTexCoord;
-
-void main() {
-    // Normal matrix keeps normals perpendicular under non-uniform scale.
-    // TODO(jade): hoist to a uniform when per-vertex inverse() shows up in a profile.
-    vNormal = mat3(transpose(inverse(uModel))) * aNormal;
-    vColor = aColor;
-    vTexCoord = aTexCoord;
-    gl_Position = uViewProj * uModel * vec4(aPosition, 1.0);
-}
-)";
-
-constexpr const char* kTriangleFragmentSrc = R"(
-#version 330 core
-in vec3 vNormal;
-in vec3 vColor;
-in vec2 vTexCoord;
-
-uniform sampler2D uTexture;
-uniform vec3 uLightDir; // unit vector from the surface toward the light
-
-out vec4 FragColor;
-
-void main() {
-    // Lambert over an ambient floor: unlit faces stay readable, lit faces pop.
-    float ndotl = max(dot(normalize(vNormal), normalize(uLightDir)), 0.0);
-    float lit = 0.15 + 0.85 * ndotl;
-    FragColor = vec4(vColor * lit, 1.0) * texture(uTexture, vTexCoord);
-}
-)";
-
-} // namespace
 
 int main() {
     using namespace jade;
@@ -83,49 +38,44 @@ int main() {
         Input    input(window.native());
         Renderer renderer;
 
-        Shader shader(kTriangleVertexSrc, kTriangleFragmentSrc);
+        // Everything below loads from disk — Phase 4's whole point. The
+        // unique_ptrs are declared after Window so all GL objects die before
+        // the context does, and before the Scene so its non-owning pointers
+        // never outlive what they point at.
+        std::unique_ptr<Shader>  shader    = loadShader("shaders/basic.vert",
+                                                        "shaders/basic.frag");
+        std::unique_ptr<Texture> checker   = loadTexture("textures/checker.png");
+        std::unique_ptr<Mesh>    cubeMesh  = loadMeshObj("meshes/cube.obj");
+        std::unique_ptr<Mesh>    planeMesh = loadMeshObj("meshes/plane.obj");
 
-        const Vertex vertices[] = {
-            {{ 0.0f,  0.55f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.25f, 0.20f}, {0.5f, 1.0f}},
-            {{-0.55f, -0.55f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.20f, 0.85f, 0.30f}, {0.0f, 0.0f}},
-            {{ 0.55f, -0.55f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.20f, 0.40f, 1.00f}, {1.0f, 0.0f}},
-        };
-        const std::uint32_t indices[] = {0, 1, 2};
-        Mesh triangle(vertices, 3, indices, 3);
-
-        // Real 1x1 white RGBA upload. Sampling it leaves vertex colors unchanged.
-        const unsigned char kWhiteRgba[] = {255, 255, 255, 255};
-        Texture white(1, 1, kWhiteRgba);
-
-        // Flat scene: four views of the one triangle mesh, each with its own
-        // transform. Mesh/texture pointers are non-owning — the objects above
-        // outlive the scene (declared earlier in this scope).
+        // Lit ground plane with three cubes resting on it (plane top sits at
+        // y = -0.6; each cube's center is that plus half its scaled height).
         Scene scene;
         {
-            Entity& center = scene.createEntity("triangle-center");
-            center.mesh = &triangle;
-            center.texture = &white;
+            Entity& ground = scene.createEntity("ground");
+            ground.mesh = planeMesh.get();
+            ground.texture = checker.get();
+            ground.transform.position = {0.0f, -0.6f, 0.0f};
+            ground.transform.scale = {3.0f, 1.0f, 3.0f};
 
-            Entity& left = scene.createEntity("triangle-left");
-            left.mesh = &triangle;
-            left.texture = &white;
-            left.transform.position = {-1.1f, 0.0f, -0.8f};
-            left.transform.rotationEuler.y = 0.6f;
-            left.transform.scale = {0.6f, 0.6f, 0.6f};
+            Entity& cubeA = scene.createEntity("cube-center");
+            cubeA.mesh = cubeMesh.get();
+            cubeA.texture = checker.get();
+            cubeA.transform.position = {0.0f, -0.1f, 0.0f};
 
-            Entity& right = scene.createEntity("triangle-right");
-            right.mesh = &triangle;
-            right.texture = &white;
-            right.transform.position = {1.1f, 0.0f, -0.8f};
-            right.transform.rotationEuler.y = -0.6f;
-            right.transform.scale = {0.6f, 0.6f, 0.6f};
+            Entity& cubeB = scene.createEntity("cube-left");
+            cubeB.mesh = cubeMesh.get();
+            cubeB.texture = checker.get();
+            cubeB.transform.position = {-1.4f, -0.3f, -0.9f};
+            cubeB.transform.rotationEuler.y = 0.5f;
+            cubeB.transform.scale = {0.6f, 0.6f, 0.6f};
 
-            Entity& distant = scene.createEntity("triangle-far");
-            distant.mesh = &triangle;
-            distant.texture = &white;
-            distant.transform.position = {0.0f, 0.9f, -1.5f};
-            distant.transform.rotationEuler.z = 3.14159265f; // roll: upside down
-            distant.transform.scale = {0.4f, 0.4f, 0.4f};
+            Entity& cubeC = scene.createEntity("cube-right");
+            cubeC.mesh = cubeMesh.get();
+            cubeC.texture = checker.get();
+            cubeC.transform.position = {1.3f, -0.35f, 0.6f};
+            cubeC.transform.rotationEuler.y = -0.7f;
+            cubeC.transform.scale = {0.5f, 0.5f, 0.5f};
         }
 
         // Static camera two units back on +Z, looking at the triangle. The
@@ -180,7 +130,7 @@ int main() {
                 if (entity.mesh == nullptr || entity.texture == nullptr) {
                     continue; // nothing to draw yet — entities may be data-only
                 }
-                renderer.draw(*entity.mesh, shader, *entity.texture,
+                renderer.draw(*entity.mesh, *shader, *entity.texture,
                               entity.transform.matrix());
             }
 
@@ -202,6 +152,9 @@ int main() {
         JADE_LOG_ERROR(std::string("Failed to start Jade Engine: ") + error.what());
         return 1;
     } catch (const ShaderError& error) {
+        JADE_LOG_ERROR(std::string("Failed to start Jade Engine: ") + error.what());
+        return 1;
+    } catch (const AssetError& error) {
         JADE_LOG_ERROR(std::string("Failed to start Jade Engine: ") + error.what());
         return 1;
     } catch (const std::exception& error) {

@@ -57,6 +57,10 @@ endif()
 # As we add modules in Phase 1, append their .cpp files here.
 add_executable(jade
     main.cpp
+    assets/AssetPaths.cpp
+    assets/MeshLoader.cpp
+    assets/ShaderLoader.cpp
+    assets/TextureLoader.cpp
     core/GLDebug.cpp
     core/Input.cpp
     core/Logger.cpp
