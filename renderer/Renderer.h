@@ -1,7 +1,8 @@
 #pragma once
 
-// Clear + draw orchestration. Phase 1 keeps this thin: no camera, no
-// scene list, no material stack. Call beginFrame() then draw() each
+// Clear + draw orchestration. Still thin by design: the camera hands in one
+// view-projection per frame, entities hand in a model matrix per draw, and
+// there is no material stack yet. Call beginFrame() then draw() each
 // variable-rate render tick.
 
 #include "math/MathTypes.h"

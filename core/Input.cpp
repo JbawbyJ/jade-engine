@@ -65,7 +65,12 @@ void Input::enrollKey(std::size_t index) const {
     }
     // Seed BOTH snapshots from the live state: a key that is already held at
     // enrollment must not read as a fresh press edge on the next frame.
+    // Poll twice: the first poll consumes a pending sticky press, the second
+    // reports the true live state. Seeding from the second avoids both a
+    // phantom press edge (key genuinely held) and an orphan release edge
+    // (sticky tap consumed into a true seed that clears next frame).
     m_keyTracked[index] = true;
+    (void)glfwGetKey(m_window, static_cast<int>(index));
     const bool down =
         glfwGetKey(m_window, static_cast<int>(index)) == GLFW_PRESS;
     m_keysDown[index] = down;

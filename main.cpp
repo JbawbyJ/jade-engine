@@ -1,5 +1,6 @@
 // Jade Engine - entry point.
-// Phase 1: window + timer + input + a colored mesh drawn each frame.
+// Phase 3 demo: fixed camera over a flat scene of transformed entities,
+// drawn each variable frame while the fixed-step drain awaits Phase 5.
 
 #include <cstdint>
 #include <cstdlib>
