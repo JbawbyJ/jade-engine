@@ -108,7 +108,9 @@ if(JADE_BUILD_TESTS)
         tests/TimerTests.cpp
         tests/MathTests.cpp
         tests/CameraTests.cpp
+        tests/TransformTests.cpp
         core/Timer.cpp
+        math/Transform.cpp
         renderer/Camera.cpp
     )
     target_include_directories(jade_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
