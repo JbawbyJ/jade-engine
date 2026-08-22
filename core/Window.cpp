@@ -206,12 +206,20 @@ void Window::framebufferSizeCallback(GLFWwindow* window, int width, int height) 
     GL_CHECK(glViewport(0, 0, width, height));
 
     // Exception barrier: user callbacks must not unwind GLFW's C frames (UB).
+    // The handlers' own log lines allocate, so they get a swallowing guard
+    // too — under memory pressure even reporting the failure can throw.
     try {
         if (self->m_onResize) self->m_onResize(width, height);
     } catch (const std::exception& error) {
-        JADE_LOG_ERROR(std::string("Resize callback threw: ") + error.what());
+        try {
+            JADE_LOG_ERROR(std::string("Resize callback threw: ") + error.what());
+        } catch (...) {
+        }
     } catch (...) {
-        JADE_LOG_ERROR("Resize callback threw a non-standard exception");
+        try {
+            JADE_LOG_ERROR("Resize callback threw a non-standard exception");
+        } catch (...) {
+        }
     }
 
     if (previous != window) {

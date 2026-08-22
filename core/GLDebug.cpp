@@ -76,9 +76,17 @@ namespace {
                 JADE_LOG_WARN(text);
             }
         } catch (const std::exception& error) {
-            JADE_LOG_ERROR(std::string("GL debug callback threw: ") + error.what());
+            // The handler's log line allocates too — swallow if even that
+            // fails; nothing may unwind the driver's C frames.
+            try {
+                JADE_LOG_ERROR(std::string("GL debug callback threw: ") + error.what());
+            } catch (...) {
+            }
         } catch (...) {
-            JADE_LOG_ERROR("GL debug callback threw a non-standard exception");
+            try {
+                JADE_LOG_ERROR("GL debug callback threw a non-standard exception");
+            } catch (...) {
+            }
         }
     }
 
