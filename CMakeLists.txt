@@ -41,11 +41,11 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(glm   CONFIG REQUIRED)
 
 # Phase 4 asset dependencies. tinyobjloader exports the same CONFIG target
-# from vcpkg and from system packages. stb is header-only with two layouts:
-# vcpkg ships a find module (Stb_INCLUDE_DIR, headers unprefixed), Ubuntu
-# installs under /usr/include/stb — find_path with the suffix covers both.
+# from vcpkg and from system packages. stb is header-only with two layouts
+# (vcpkg: unprefixed under the vcpkg include root; Ubuntu: /usr/include/stb)
+# and ships NO find module or config anywhere — the find_path below is the
+# real resolution on every platform, not a fallback. Do not delete it.
 find_package(tinyobjloader CONFIG REQUIRED)
-find_package(Stb QUIET)
 if(NOT Stb_INCLUDE_DIR)
     find_path(Stb_INCLUDE_DIR stb_image.h PATH_SUFFIXES stb)
 endif()
@@ -96,12 +96,21 @@ target_link_libraries(jade PRIVATE
 )
 
 # Runtime assets live next to the binary so exe-relative resolution works the
-# same from a dev tree, CI, and an unpacked release.
-add_custom_command(TARGET jade POST_BUILD
+# same from a dev tree, CI, and an unpacked release. A standalone ALL target
+# (not POST_BUILD) so editing only a shader/texture still syncs on the next
+# build — POST_BUILD would skip when the binary is up to date. Content dirs
+# only: assets/ also holds loader sources, which must not ship next to the
+# binary. Note copy_directory never deletes: a removed asset lingers in the
+# build dir until a clean build (rename-test on a clean checkout).
+add_custom_target(jade_assets ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/assets"
-            "$<TARGET_FILE_DIR:jade>/assets"
-    COMMENT "Copying assets next to the jade binary")
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/meshes"   "$<TARGET_FILE_DIR:jade>/assets/meshes"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders"  "$<TARGET_FILE_DIR:jade>/assets/shaders"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/textures" "$<TARGET_FILE_DIR:jade>/assets/textures"
+    COMMENT "Syncing content dirs next to the jade binary")
+add_dependencies(jade_assets jade)
 
 # Strict warnings on day one. Future bugs hide behind warnings; we kill them now.
 # Shared via an interface target so every engine target (jade, jade_tests)

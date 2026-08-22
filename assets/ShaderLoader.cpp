@@ -7,6 +7,7 @@
 #include "assets/AssetError.h"
 #include "assets/AssetPaths.h"
 #include "core/Logger.h"
+#include "renderer/Shader.h"
 
 namespace jade {
 

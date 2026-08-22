@@ -59,6 +59,18 @@ Vec3 flatFaceNormal(const Vec3& p0, const Vec3& p1, const Vec3& p2) {
     return cross / std::sqrt(lengthSq);
 }
 
+// tinyobj treats out-of-range indices as a WARNING and still returns success,
+// so trusting them would turn a typo in a hand-authored OBJ into a heap
+// over-read. Content errors are recoverable: validate and throw AssetError.
+void validateIndex(int index, std::size_t elementCount, const char* stream,
+                   const std::string& pathForError) {
+    if (index >= 0 && static_cast<std::size_t>(index) < elementCount) {
+        return;
+    }
+    throw AssetError("OBJ '" + pathForError + "' references out-of-range " +
+                     stream + " index " + std::to_string(index));
+}
+
 // De-index every triangle into a flat Vertex array. OBJ indexes position /
 // normal / uv independently per corner (three parallel index streams — like
 // zipping separate JS arrays per element); GL wants one index per whole
@@ -66,7 +78,8 @@ Vec3 flatFaceNormal(const Vec3& p0, const Vec3& p1, const Vec3& p2) {
 // TODO(jade): dedupe identical corners into a shared index buffer when
 // meshes get big enough for the memory to matter.
 std::vector<Vertex> buildVertices(const tinyobj::attrib_t& attrib,
-                                  const std::vector<tinyobj::shape_t>& shapes) {
+                                  const std::vector<tinyobj::shape_t>& shapes,
+                                  const std::string& pathForError) {
     std::size_t totalIndices = 0;
     for (const tinyobj::shape_t& shape : shapes) {
         totalIndices += shape.mesh.indices.size();
@@ -92,6 +105,18 @@ std::vector<Vertex> buildVertices(const tinyobj::attrib_t& attrib,
             const tinyobj::index_t corners[3] = {mesh.indices[indexOffset + 0],
                                                  mesh.indices[indexOffset + 1],
                                                  mesh.indices[indexOffset + 2]};
+            for (const tinyobj::index_t& corner : corners) {
+                validateIndex(corner.vertex_index, attrib.vertices.size() / 3,
+                              "vertex", pathForError);
+                if (corner.normal_index >= 0) {
+                    validateIndex(corner.normal_index, attrib.normals.size() / 3,
+                                  "normal", pathForError);
+                }
+                if (corner.texcoord_index >= 0) {
+                    validateIndex(corner.texcoord_index, attrib.texcoords.size() / 2,
+                                  "texcoord", pathForError);
+                }
+            }
             const Vec3 positions[3] = {readPosition(attrib, corners[0].vertex_index),
                                        readPosition(attrib, corners[1].vertex_index),
                                        readPosition(attrib, corners[2].vertex_index)};
@@ -146,7 +171,8 @@ std::unique_ptr<Mesh> loadMeshObj(const std::filesystem::path& relative) {
                       trimTrailingWhitespace(reader.Warning()));
     }
 
-    const std::vector<Vertex> vertices = buildVertices(reader.GetAttrib(), reader.GetShapes());
+    const std::vector<Vertex> vertices =
+        buildVertices(reader.GetAttrib(), reader.GetShapes(), fullPath.string());
     if (vertices.empty()) {
         // Mesh JADE_ASSERTs on empty buffers — that abort is for programmer
         // errors. An empty .obj is a content error, so throw instead.

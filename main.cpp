@@ -1,6 +1,7 @@
 // Jade Engine - entry point.
-// Phase 3 demo: fixed camera over a flat scene of transformed entities,
-// drawn each variable frame while the fixed-step drain awaits Phase 5.
+// Phase 5 demo: fly camera (WASD + Space/LeftShift, right-drag look) over a
+// disk-loaded, Lambert-lit scene; simulation runs on the fixed step and
+// rendering blends the last two simulation states by Timer::alpha().
 
 #include <cstdlib>
 #include <exception>

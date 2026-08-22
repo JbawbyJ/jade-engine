@@ -39,6 +39,9 @@ void Renderer::draw(const Mesh& mesh, const Shader& shader) const {
     shader.bind();
     shader.setMat4("uViewProj", m_viewProjection);
     shader.setMat4("uModel", Mat4{1.0f});
+    // Every overload uploads the light: a lit shader drawn through this path
+    // must never sample the zero default (normalize(vec3(0)) is undefined).
+    shader.setVec3("uLightDir", m_lightDirection);
     mesh.draw();
 }
 

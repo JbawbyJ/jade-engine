@@ -7,11 +7,12 @@
 #include <filesystem>
 #include <memory>
 
-// Full Shader definition (not a forward declaration): every caller receives a
-// unique_ptr<Shader> and needs the complete type to use — and to destroy — it.
-#include "renderer/Shader.h"
-
 namespace jade {
+
+// Forward declaration keeps renderer/Shader.h out of includers (rule 14, and
+// consistent with TextureLoader/MeshLoader). Callers include the full header
+// wherever the returned unique_ptr is used or destroyed.
+class Shader;
 
 // Both paths are relative to assetRoot(), e.g. "shaders/basic.vert".
 // Ownership transfers to the caller via unique_ptr (rule 4 allowance: Shader
