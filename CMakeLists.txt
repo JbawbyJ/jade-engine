@@ -26,7 +26,9 @@ find_package(glm   CONFIG REQUIRED)
 # As we add modules in Phase 1, append their .cpp files here.
 add_executable(jade
     main.cpp
+    core/Input.cpp
     core/Logger.cpp
+    core/Timer.cpp
     core/Window.cpp
 )
 
