@@ -58,6 +58,12 @@ int main() {
     using namespace jade;
 
     try {
+        // Camera is declared BEFORE Window on purpose: the resize callback
+        // stored on the window captures it by reference, and destruction runs
+        // in reverse order — the camera must outlive the window that might
+        // still dispatch into that callback during teardown.
+        Camera camera;
+
         Window   window(WindowProps{"Jade Engine", 1280, 720});
         Timer    timer;
         Input    input(window.native());
@@ -79,10 +85,12 @@ int main() {
 
         // Static camera two units back on +Z, looking at the triangle. The
         // Phase 5 controller will fly it; for now only the aspect tracks the
-        // framebuffer so resizing never stretches the scene.
-        Camera camera;
-        camera.setAspect(static_cast<float>(window.framebufferWidth())
-                         / static_cast<float>(window.framebufferHeight()));
+        // framebuffer so resizing never stretches the scene. Both aspect
+        // paths guard height 0 (minimized / not-yet-realized framebuffers).
+        if (window.framebufferHeight() > 0) {
+            camera.setAspect(static_cast<float>(window.framebufferWidth())
+                             / static_cast<float>(window.framebufferHeight()));
+        }
         window.setResizeCallback([&camera](int width, int height) {
             if (height > 0) {
                 camera.setAspect(static_cast<float>(width) / static_cast<float>(height));
@@ -111,7 +119,9 @@ int main() {
             window.pollEvents();
             input.update();
 
-            if (input.isKeyDown(Key::Escape)) {
+            // Edge query, not a live poll: with sticky input a press+release
+            // inside one frame still registers, so a quick ESC tap always quits.
+            if (input.wasKeyPressed(Key::Escape)) {
                 window.requestClose();
             }
 

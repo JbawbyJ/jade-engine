@@ -56,7 +56,20 @@ void Input::update() {
 }
 
 bool Input::validKey(int key) const {
-    return key >= 0 && static_cast<std::size_t>(key) < kKeyCount;
+    return key >= kFirstValidKey && key <= kLastValidKey;
+}
+
+void Input::enrollKey(std::size_t index) const {
+    if (m_keyTracked[index]) {
+        return;
+    }
+    // Seed BOTH snapshots from the live state: a key that is already held at
+    // enrollment must not read as a fresh press edge on the next frame.
+    m_keyTracked[index] = true;
+    const bool down =
+        glfwGetKey(m_window, static_cast<int>(index)) == GLFW_PRESS;
+    m_keysDown[index] = down;
+    m_keysDownLast[index] = down;
 }
 
 bool Input::validButton(int button) const {
@@ -64,24 +77,29 @@ bool Input::validButton(int button) const {
 }
 
 bool Input::isKeyDown(int key) const {
-    // Live query — valid for any GLFW key code, not only the tracked set.
-    // Note: with sticky mode on, a live poll consumes a pending sticky press,
-    // so taps are better read through wasKeyPressed.
+    // Tracked keys answer from this frame's snapshot: every query in a frame
+    // agrees, and a sticky sub-frame tap is not silently consumed by a live
+    // poll. Untracked keys fall back to a live query (and stay untracked —
+    // only the edge queries opt a key into snapshotting).
     if (!validKey(key)) return false;
+    const std::size_t i = static_cast<std::size_t>(key);
+    if (m_keyTracked[i]) {
+        return m_keysDown[i];
+    }
     return glfwGetKey(m_window, key) == GLFW_PRESS;
 }
 
 bool Input::wasKeyPressed(int key) const {
     if (!validKey(key)) return false;
     const std::size_t i = static_cast<std::size_t>(key);
-    m_keyTracked[i] = true; // enroll: accurate from the next update() onward
+    enrollKey(i); // accurate from the next update() onward
     return m_keysDown[i] && !m_keysDownLast[i];
 }
 
 bool Input::wasKeyReleased(int key) const {
     if (!validKey(key)) return false;
     const std::size_t i = static_cast<std::size_t>(key);
-    m_keyTracked[i] = true; // enroll: accurate from the next update() onward
+    enrollKey(i); // accurate from the next update() onward
     return !m_keysDown[i] && m_keysDownLast[i];
 }
 

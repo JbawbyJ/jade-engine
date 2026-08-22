@@ -70,18 +70,28 @@ private:
     static constexpr std::size_t kKeyCount    = 512; // covers GLFW_KEY_LAST (348)
     static constexpr std::size_t kButtonCount = 8;   // covers GLFW_MOUSE_BUTTON_LAST
 
+    // GLFW's accepted key-token range (GLFW_KEY_SPACE..GLFW_KEY_LAST). Codes
+    // outside it make glfwGetKey raise GLFW_INVALID_ENUM, so validKey rejects
+    // them up front — one bad query must not turn into per-frame error spam
+    // via auto-enrollment.
+    static constexpr int kFirstValidKey = 32;
+    static constexpr int kLastValidKey  = 348;
+
     bool validKey(int key) const;
     bool validButton(int button) const;
 
     GLFWwindow* m_window{nullptr};
 
-    // m_keyTracked is mutable so const edge queries can enroll a key into the
-    // snapshot set (a cache decision, not logical state). Seeded with the
-    // Key:: constants in the constructor.
-    mutable bool m_keyTracked[kKeyCount]{};
+    void enrollKey(std::size_t index) const;
 
-    bool m_keysDown[kKeyCount]{};
-    bool m_keysDownLast[kKeyCount]{};
+    // The key-tracking arrays are mutable so const edge queries can lazily
+    // enroll a key into the snapshot set (a cache decision, not logical
+    // state); enrollment seeds both snapshots from the live state so an
+    // already-held key cannot manufacture a phantom press edge. Seeded with
+    // the Key:: constants in the constructor.
+    mutable bool m_keyTracked[kKeyCount]{};
+    mutable bool m_keysDown[kKeyCount]{};
+    mutable bool m_keysDownLast[kKeyCount]{};
     bool m_buttonsDown[kButtonCount]{};
     bool m_buttonsDownLast[kButtonCount]{};
 };
