@@ -35,6 +35,13 @@ public:
     // return true. Drive: while (timer.consumeFixedStep()) { /* fixed update */ }
     bool consumeFixedStep();
 
+    // Fraction of the NEXT fixed step already elapsed: m_accumulator / kFixedDelta.
+    // Meaningful after the consumeFixedStep() drain has run — the leftover
+    // accumulator is then < kFixedDelta, so alpha is in [0, 1) and is exactly
+    // the blend factor for interpolate(previous, current, alpha) rendering.
+    // (Mid-frame, before draining, it can read >= 1.)
+    float alpha() const { return m_accumulator / kFixedDelta; }
+
     // Seconds since the first tick (sum of clamped per-frame deltas).
     double totalTime() const { return m_total; }
 

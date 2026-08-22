@@ -55,3 +55,44 @@ TEST_CASE("Timer: deltaTime reflects the clamped value") {
     timer.advance(0.02f);
     CHECK(timer.deltaTime() == doctest::Approx(0.02f)); // last advance wins
 }
+
+TEST_CASE("Timer: fresh timer has alpha 0") {
+    const jade::Timer timer;
+    CHECK(timer.alpha() == 0.0f); // empty accumulator, exactly zero
+}
+
+TEST_CASE("Timer: half a fixed step gives alpha ~0.5 and no consumable step") {
+    jade::Timer timer;
+    // 0.5f * fixedDelta scales the float by a power of two, so the
+    // accumulator holds exactly half a step and alpha divides back out.
+    timer.advance(0.5f * timer.fixedDelta());
+    CHECK(timer.alpha() == doctest::Approx(0.5f).epsilon(1e-6));
+    CHECK_FALSE(timer.consumeFixedStep()); // half a step banks nothing
+}
+
+TEST_CASE("Timer: alpha returns to ~0 after a one-step advance is drained") {
+    jade::Timer timer;
+    timer.advance(timer.fixedDelta());
+    CHECK(timer.consumeFixedStep());
+    // Same float added then subtracted — the residue is zero, but assert
+    // "near zero" so a future reformulation of the drain stays legal.
+    CHECK(timer.alpha() == doctest::Approx(0.0f).epsilon(1e-6));
+    CHECK_FALSE(timer.consumeFixedStep());
+}
+
+TEST_CASE("Timer: alpha stays in [0, 1) after any single advance + drain") {
+    // Post-drain the accumulator is < kFixedDelta by construction, so alpha
+    // must sit in [0, 1) — that is the interpolation contract Phase 5 renders
+    // with. Sweep spans below, at, above, and beyond the clamp.
+    const float spans[] = {0.0f,          0.01f, 1.0f / 60.0f, 0.1f,
+                           1.0f / 60.0f * 7.5f,  0.25f,        0.9f};
+    for (const float rawSeconds : spans) {
+        CAPTURE(rawSeconds);
+        jade::Timer timer;
+        timer.advance(rawSeconds);
+        while (timer.consumeFixedStep()) {
+        }
+        CHECK(timer.alpha() >= 0.0f);
+        CHECK(timer.alpha() < 1.0f);
+    }
+}

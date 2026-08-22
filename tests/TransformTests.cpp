@@ -9,6 +9,8 @@
 #include <doctest/doctest.h>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <cmath>
+
 namespace {
 
 constexpr float kPi = 3.14159265358979323846f;
@@ -127,4 +129,96 @@ TEST_CASE("Transform: matrix() equals the manual T*Ry*Rx*Rz*S product") {
     const jade::Vec4 probe{1.0f, 0.0f, 0.0f, 1.0f};
     const jade::Vec3 divergence{reference * probe - swapped * probe};
     CHECK(glm::length(divergence) > 0.1f);
+}
+
+// --- interpolate() — Phase 5 snapshot + blend ------------------------------
+
+namespace {
+
+// Two deliberately unrelated full poses; every Euler component stays within
+// pi of its partner so the endpoint cases are pure "reproduce from/to" checks
+// with no wrap in play.
+jade::Transform makeFrom() {
+    jade::Transform t;
+    t.position = jade::Vec3{1.0f, 2.0f, 3.0f};
+    t.rotationEuler = jade::Vec3{0.4f, 1.1f, -0.7f};
+    t.scale = jade::Vec3{1.5f, 0.75f, 2.0f};
+    return t;
+}
+
+jade::Transform makeTo() {
+    jade::Transform t;
+    t.position = jade::Vec3{-2.0f, 0.5f, 7.0f};
+    t.rotationEuler = jade::Vec3{-0.2f, 0.6f, 0.9f};
+    t.scale = jade::Vec3{0.5f, 3.0f, 1.0f};
+    return t;
+}
+
+} // namespace
+
+TEST_CASE("interpolate: alpha 0 reproduces from.matrix(), alpha 1 to.matrix()") {
+    const jade::Transform from = makeFrom();
+    const jade::Transform to = makeTo();
+
+    // All 16 entries, Approx: alpha 1 walks from + 1*(to - from), and that
+    // float round trip may land an ulp or two off `to`'s own components.
+    checkMat4(jade::interpolate(from, to, 0.0f), from.matrix());
+    checkMat4(jade::interpolate(from, to, 1.0f), to.matrix());
+}
+
+TEST_CASE("interpolate: alpha 0.5 blends position and scale to the midpoint") {
+    // Rotation stays zero in both poses so a transformed point isolates the
+    // translate + scale halves: M * p = midScale * p + midPosition.
+    jade::Transform from;
+    from.position = jade::Vec3{1.0f, 2.0f, 3.0f};
+    from.scale = jade::Vec3{1.0f, 1.0f, 1.0f};
+
+    jade::Transform to;
+    to.position = jade::Vec3{3.0f, -2.0f, 7.0f};
+    to.scale = jade::Vec3{3.0f, 5.0f, 1.0f};
+
+    // Derived stepwise, same shape as the implementation's lerp.
+    const jade::Vec3 midPosition = from.position + 0.5f * (to.position - from.position);
+    const jade::Vec3 midScale = from.scale + 0.5f * (to.scale - from.scale);
+
+    const jade::Vec3 point{1.0f, -1.0f, 2.0f};
+    const jade::Vec3 expected = midScale * point + midPosition; // scale first, then translate
+    checkVec4(jade::interpolate(from, to, 0.5f) * jade::Vec4{point, 1.0f},
+              jade::Vec4{expected, 1.0f});
+}
+
+TEST_CASE("interpolate: yaw +3.0 to -3.0 blends across the +/-pi seam, not through 0") {
+    // Rotation-only poses so the matrix is pure Ry.
+    jade::Transform from;
+    from.rotationEuler.y = 3.0f;
+    jade::Transform to;
+    to.rotationEuler.y = -3.0f;
+
+    // Derive the short arc stepwise. The raw difference is -6.0 rad, which is
+    // below -pi, so the shortest arc adds one full turn: -6 + 2*pi = +0.2831...
+    // — a small POSITIVE step onward past +pi, not the -6.0 march back
+    // through 0.
+    const float rawDiff = to.rotationEuler.y - from.rotationEuler.y;
+    CHECK(rawDiff < -kPi); // precondition that makes this a wrap case at all
+    const float wrappedDiff = rawDiff + 2.0f * kPi;
+    const float expectedYaw = from.rotationEuler.y + 0.5f * wrappedDiff; // ~= +pi
+
+    // Halfway along the short arc sits on the seam itself: |yaw| ~= pi.
+    CHECK(std::fabs(expectedYaw) == doctest::Approx(kPi).epsilon(1e-4));
+
+    jade::Transform expected;
+    expected.rotationEuler.y = expectedYaw;
+    const jade::Mat4 blended = jade::interpolate(from, to, 0.5f);
+    checkMat4(blended, expected.matrix(), 1e-4f);
+
+    // Behavioral check via the forward direction: yaw ~pi turns -Z to +Z.
+    // The long way (naive lerp -> yaw 0) would leave forward at -Z, so the z
+    // sign alone separates the two arcs.
+    const jade::Vec4 forward = blended * jade::Vec4{0.0f, 0.0f, -1.0f, 0.0f};
+    CHECK(forward.z == doctest::Approx(1.0f).epsilon(1e-4));
+
+    jade::Transform longWay;
+    longWay.rotationEuler.y = from.rotationEuler.y + 0.5f * rawDiff; // = 0.0, through 0
+    const jade::Vec4 longForward = longWay.matrix() * jade::Vec4{0.0f, 0.0f, -1.0f, 0.0f};
+    CHECK(glm::length(jade::Vec3{forward - longForward}) > 1.0f); // opposite hemispheres
 }
