@@ -2,11 +2,22 @@
 
 **Repo:** `JbawbyJ/jade-engine`
 **Scope:** Phase 7 exit and the full-roadmap acceptance (M-final)
-**Verdict:** Phases 2.0 through 7 are complete and locally verified end-to-end,
-including the packaged-binary acceptance flow. **CI evidence pending:** push access
-from this environment was blocked for the whole run (the Claude GitHub App lacks
-write access to the repo), so the three-leg CI matrix, cache-save proof, and artifact
-uploads run on the first successful push. Every CI-dependent claim below is marked.
+**Verdict:** Phases 2.0 through 7 are complete and verified end-to-end, including
+the packaged-binary acceptance flow — locally and now in CI.
+
+**CI evidence (added 2026-08-23, once push access was granted):**
+
+- [Run 32646675625](https://github.com/JbawbyJ/jade-engine/actions/runs/32646675625)
+  — first cloud run, cold caches: **Ubuntu green** (build, ctest, headless gate,
+  package smoke, `jade-ubuntu` artifact, cache saved), **macOS green** (clean
+  AppleClang 21 warning survey, `jade-engine-0.1.0-Darwin-arm64.tar.gz` uploaded,
+  cache saved), **Windows red** on exactly one issue: MSVC C4996 (`std::getenv`
+  advisory) fatal under `/WX` — the WERROR-surprise risk the plan predicted.
+- Fixes: `_CRT_SECURE_NO_WARNINGS` on MSVC for the two startup env reads, and the
+  macOS survey exemption ended in the same push (`JADE_WERROR=ON` on all legs).
+- [Run 32646951393](https://github.com/JbawbyJ/jade-engine/actions/runs/32646951393)
+  — **all three legs green in ~2.5 minutes** with warm caches and warnings-as-errors
+  everywhere: the cache key fix, pinning, and per-leg package artifacts all proven.
 
 ---
 
