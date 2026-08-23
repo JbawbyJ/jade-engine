@@ -1,107 +1,76 @@
-# Jade Engine Roadmap
+# Jade Engine — Roadmap (re-anchored 2026-08-23)
 
-Phase tracker for the custom C++17 / OpenGL engine (4.6 core preferred,
-3.3 core minimum). Companion docs:
+Mission: rebuild the design philosophy of Ubisoft's Jade engine — **world streaming,
+behavior/AI scripting, animation blending, cinematic camera** — as original C++17 systems.
+BG&E is the design document: every system answers *"would this have shipped BG&E?"*
 
-- [`.cursorrules`](../.cursorrules) — full plan, coding standards, Cursor behavior
-- [`VERIFICATION_2026-08-19.md`](./VERIFICATION_2026-08-19.md) — Phase 1 foundation audit
-- [`VERIFICATION_2026-08-22.md`](./VERIFICATION_2026-08-22.md) — Phase 1 review-findings hygiene
-- [`VERIFICATION_2026-08-22-m2.md`](./VERIFICATION_2026-08-22-m2.md) — M2 first triangle / Phase 1 exit
-- [`VERIFICATION_2026-08-22-p20.md`](./VERIFICATION_2026-08-22-p20.md) — Phase 2.0 hygiene + infrastructure
-- [`VERIFICATION_2026-08-22-p2.md`](./VERIFICATION_2026-08-22-p2.md) — M4 Phase 2 debug + camera
-- [`VERIFICATION_2026-08-22-p3.md`](./VERIFICATION_2026-08-22-p3.md) — M5 Phase 3 scene + transforms
-- [`VERIFICATION_2026-08-22-p4.md`](./VERIFICATION_2026-08-22-p4.md) — M6 Phase 4 assets
-- [`VERIFICATION_2026-08-22-p5.md`](./VERIFICATION_2026-08-22-p5.md) — M7 Phase 5 gameplay loop
-- [`VERIFICATION_2026-08-22-p6.md`](./VERIFICATION_2026-08-22-p6.md) — M8 Phase 6 tooling
-- [`VERIFICATION_2026-08-22-final.md`](./VERIFICATION_2026-08-22-final.md) — M-final: Phase 7 + roadmap completion
-
-Update checkboxes when a module lands. Add a new `VERIFICATION_YYYY-MM-DD.md`
-after each meaningful checkpoint.
+> The 2026-08-22 demo sprint (fly-cam scene, packaging, 3-OS CI) is **complete and
+> frozen**. It closed the original Month 1–2 foundation milestone and half of Month 3–4.
+> Its phase numbering in older docs/commit messages is superseded by this file.
 
 ---
 
-## Phase 1 — Foundation (DONE)
+## Milestone ladder
 
-| Module | Path | Status |
-| --- | --- | --- |
-| Build wiring (C++17, vcpkg, warnings) | `CMakeLists.txt`, `vcpkg.json` | [x] Done |
-| Logger | `core/Logger.h/.cpp` | [x] Done |
-| GL_CHECK helper | `core/GLDebug.h` | [x] Done |
-| Window (GLFW + GL 4.6→3.3 fallback) | `core/Window.h/.cpp` | [x] Done |
-| Entry loop + ESC | `main.cpp` | [x] Done (Renderer + Input) |
-| Timer (delta + fixed accumulator) | `core/Timer.h/.cpp` | [x] Done |
-| Input | `core/Input.h/.cpp` | [x] Done |
-| Math types | `math/MathTypes.h` | [x] Done |
-| Renderer | `renderer/Renderer.h/.cpp` | [x] Done |
-| Shader | `renderer/Shader.h/.cpp` | [x] Done |
-| Mesh | `renderer/Mesh.h/.cpp` | [x] Done |
-| Texture | `renderer/Texture.h/.cpp` | [x] Done (1x1 RGBA upload/bind; sampled by the demo triangle) |
+### M1 — Foundation ✅ COMPLETE (frozen)
+Window/Input/Logger/Timer (fixed step + interpolation), renderer stack, OBJ/GLSL/PNG
+loaders, flat Scene, fly camera, DebugDraw, doctest suite, 3-OS CI + headless gate,
+packaging. No further investment in this surface.
 
-**Exit criteria:** fixed-timestep loop, Input module (no raw `glfwGetKey` in
-`main`), renderer draws at least one mesh with a shader, clean shutdown,
-zero-warning build. **Met.**
+### M2 — GLTF asset path 🔶 CURRENT
+- [ ] tinygltf dependency (vcpkg manifest + CMake)
+- [ ] Mesh import: positions/normals/UVs/indices from .gltf/.glb
+- [ ] Material/texture binding from GLTF materials
+- [ ] Demo scene content converted; OBJ loader and .obj assets deleted
+- [ ] Loader unit tests (parse fixtures, no GL)
+**Why first:** GLTF carries skeletons + animation clips — M5 depends on this format.
+**Exit:** demo scene renders identically from GLTF, CI green.
 
-**Ordered next commits:**
+### M3 — Entity-Component System
+- [ ] EntityId with generational handles (stale-handle safety)
+- [ ] Packed ComponentPool<T> (cache-coherent iteration)
+- [ ] World: create/destroy/query
+- [ ] Components: Transform (**with parent link** — hierarchy is load-bearing for M5),
+      MeshRenderer, Camera, Behavior
+- [ ] Flat Scene migrated; Spinner/CameraController become systems over the World
+**Exit:** demo runs on the ECS with entity destroy + handle reuse under test.
 
-1. Phase 2 when explicitly kicked off — do not invent camera / KHR_debug / asset loaders yet.
+### M4 — Behavior / AI scripting
+- [ ] StateMachine (states, transitions, conditions) — unit-tested, GL-free
+- [ ] BehaviorTree: selector / sequence / leaf + decorators
+- [ ] Blackboard shared memory
+- [ ] Acceptance: a BG&E-style NPC daily schedule (wander → work → react) in the demo world
+- [ ] (defer Lua/sol2 until two+ behaviors exist in C++)
 
----
+### M5 — World streaming  ⭐ signature system
+- [ ] docs/design/streaming.md FIRST — zones, budgets, load states, failure modes
+      (reference: BG&E GDC material, Ubisoft streaming patents, UE level streaming)
+- [ ] Zone: serialized chunk of entities + assets
+- [ ] StreamQueue: async background loading (worker thread + main-thread GL upload)
+- [ ] ZoneManager: proximity load/unload with hysteresis
+- [ ] WorldGraph: adjacency + transition triggers
+**Exit:** walk a 3×3-zone world with no hitch > one fixed step; zones visibly
+load/unload in DebugDraw.
 
-## Phase 2 — Debug + richer GL (DONE)
+### M6 — Animation blending
+- [ ] ozz-animation runtime integration
+- [ ] Skeleton + AnimationClip import from GLTF (via M2)
+- [ ] AnimationBlender: blend trees, crossfade, layer masks
+**Exit:** a character idles→walks→runs with smooth crossfades under the fixed step.
 
-- [x] KHR_debug callback (`core/GLDebug.cpp` — complements poll-style `GL_CHECK`,
-      which stays as the 3.3/4.1 fallback)
-- [x] Camera / view-projection helpers (`renderer/Camera.h/.cpp`; demo renders
-      through `uViewProj`)
-- [x] Extra log sinks (`Logger::setFileSink` file mirror)
+### M7 — Cinematic camera (CameraRig)
+- [ ] Follow / orbit / cinematic modes with constraint volumes
+- [ ] Gameplay-aware framing ("camera as a character")
+**Exit:** rig demo through the streamed world with an animated character.
 
-Phase 2.0 pre-package also landed: verified-findings hygiene pass, vcpkg
-pinning, macOS CI leg, headless CI run gate, doctest unit tests, JADE_WERROR.
-CI runs for these checkpoints are pending push access (see verification docs).
-
-## Phase 3 — Scene / transforms (DONE)
-
-- [x] Flat entity list (decision: no hierarchy; `Transform::matrix()` keeps the
-      seam open) — `scene/Entity.h`, `scene/Scene.h/.cpp`, `math/Transform.h/.cpp`
-- [x] Scene ownership rules (non-owning mesh/texture pointers; creator owns —
-      stated in `scene/Entity.h`; `EntityId` over references across spawns)
-
-## Phase 4 — Assets (DONE)
-
-- [x] Mesh / texture / shader loading from disk (`assets/` loaders: stb,
-      tinyobjloader, plain GLSL files; `AssetError` + exe-relative
-      `assetRoot()`; demo scene fully disk-loaded)
-
-## Phase 5 — Gameplay loop (DONE)
-
-- [x] Systems driven by the fixed timestep (`game/CameraController` fly camera,
-      `game/Spinner`; snapshot + blend interpolation via `Timer::alpha()` and
-      `interpolate()`; drain loop wired in `main.cpp`)
-
-## Phase 6 — Tooling / editor hooks (DONE)
-
-- [x] Multi-window / debug draw (`renderer/DebugDraw` line batcher on F1;
-      `JADE_SECOND_WINDOW=1` proof + `Window::makeCurrent`)
-
-## Phase 7 — Polish + packaging (DONE)
-
-- [x] Release config, packaging, end-user README (version stamp, CPack flat
-      package + CI artifacts with a package smoke test, demo-first README,
-      honest perf note: not profiled, no known hotspots at demo scale)
+### M8 — Vertical slice
+Small BG&E-style level exercising every system above. (The noir "Perisphere"
+concept is a candidate setting.)
 
 ---
 
-## Milestone timeline (technical, not calendar)
-
-| Milestone | Meaning |
-| --- | --- |
-| M0 First Task | Window + Logger + GL_CHECK + clear loop — **complete** |
-| M1 Timer + Input | **complete** |
-| M2 First triangle | Shader + Mesh + Renderer clear/draw — **complete** |
-| M3 Phase 1 exit | All Phase 1 modules checked above — **complete** |
-| M4 Phase 2 | KHR_debug + Camera + log sink — **complete (local verify; CI pending)** |
-| M5 Phase 3 | Transform + flat scene + model-matrix draw — **complete (local verify; CI pending)** |
-| M6 Phase 4 | Disk-loaded assets + Lambert lighting — **complete (local verify; CI pending)** |
-| M7 Phase 5 | Fly camera + interpolated fixed-step loop — **complete (local verify; CI pending)** |
-| M8 Phase 6 | Debug draw + multi-window proof — **complete (local verify; CI pending)** |
-| M9 / M-final | Phase 7 polish + packaging — **complete (local verify incl. packaged-binary run; CI pending)** |
+## Standing rules
+- Build strictly in order; no M(N+1) work while M(N) is open.
+- Design-heavy milestones (M5, M6) require a reviewed design doc before code.
+- CI stays green; the frozen M1 surface (packaging/release/CI) is not extended.
+- Tick boxes here in the same commit that completes them.
