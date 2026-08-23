@@ -2,6 +2,7 @@
   "name": "jade-engine",
   "version": "0.1.0",
   "description": "Jade Engine - custom C++ game engine inspired by Ubisoft Jade (branding only)",
+  "builtin-baseline": "127402f1c75bb3d5ff6bce04b285faa4930a5aca",
   "dependencies": [
     "glfw3",
     {
@@ -10,6 +11,9 @@
         "gl-api-46"
       ]
     },
-    "glm"
+    "glm",
+    "doctest",
+    "stb",
+    "tinyobjloader"
   ]
 }

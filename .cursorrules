@@ -1,9 +1,9 @@
 # Jade Engine — Cursor Rules
 
 Custom C++17 game engine inspired by Ubisoft's Jade (branding only). Built with
-CMake + vcpkg (glfw3, glad[gl-api-46] core overlay). Prefers OpenGL 4.6 core,
-falls back to 4.5 / 4.3 / 3.3. Phase-gated development — finish the current
-module before opening the next.
+CMake + vcpkg (glfw3, glad[gl-api-46] core overlay, glm). Prefers OpenGL 4.6
+core, falls back to 4.5 / 4.3 / 4.1 / 3.3 (4.1 is the macOS ceiling).
+Phase-gated development — finish the current module before opening the next.
 
 This file is the durable plan. Prefer it over chat history. When in doubt, stay
 on the current Phase 1 checklist in `docs/ROADMAP.md`.
@@ -15,7 +15,7 @@ on the current Phase 1 checklist in `docs/ROADMAP.md`.
 - **Name:** Jade Engine
 - **Language:** C++17 (required, extensions OFF)
 - **Build:** CMake 3.20+, Ninja preferred
-- **Deps:** vcpkg manifest (`vcpkg.json`) — glfw3, glad (`gl-api-46` + core overlay), glm.
+- **Deps:** vcpkg manifest (`vcpkg.json`) — glfw3, glad (`gl-api-46` + core overlay), glm, doctest (tests only).
 - **Binary:** `jade` → `${CMAKE_BINARY_DIR}/bin/jade`
 - **Include root:** project root (`#include "core/Window.h"`)
 
@@ -39,7 +39,10 @@ on the current Phase 1 checklist in `docs/ROADMAP.md`.
    for programmer invariants. Recoverable init failures throw (`WindowError`)
    or use `JADE_LOG_ERROR` and a graceful path.
 8. Every OpenGL call wraps in `GL_CHECK(...)` from day one (`core/GLDebug.h`).
-9. New `.cpp` files are added to `CMakeLists.txt` in the same commit.
+9. New `.cpp` files are added to `CMakeLists.txt` in the same commit — or,
+   in a multi-module wave where a module lands before its integration
+   commit, the deferral is disclosed in the landing commit's message and the
+   wiring lands in the same wave.
 10. Platform differences go behind `#if defined(_WIN32)` / `#else` (see Logger).
 11. Comments may use short web-dev analogies when they clarify intent
     (e.g. resize callback ≈ JS event emitter). Keep them tight.
@@ -104,7 +107,8 @@ log. Zero warnings.
     ("spiral of death" guard — same idea as capping `dt` in a JS `requestAnimationFrame` loop).
   - Maintain a fixed-timestep accumulator. Default fixed step: `1/60` second
     (`kFixedDelta`).
-  - API: `tick()`, `deltaTime()`, `fixedDelta()`, `consumeFixedStep()`, `totalTime()`.
+  - API: `tick()`, `advance(float)` (deterministic test/replay seam),
+    `deltaTime()`, `fixedDelta()`, `consumeFixedStep()`, `totalTime()`.
   - No GLFW dependency. Pure chrono.
   - Wired into `main.cpp`.
 
@@ -125,37 +129,206 @@ log. Zero warnings.
 - Demo path embeds `#version 330 core` GLSL in `main.cpp` (no asset files).
 - Every GL call wraps in `GL_CHECK`. Shader compile/link throws `ShaderError`.
 
-### Phase 2 — Debug + richer GL
+### Phase 2 — Debug + richer GL (DONE)
 
-- Replace poll-based `GL_CHECK` with `glDebugMessageCallback` (KHR_debug) where
-  available; keep `GL_CHECK` as a fallback.
-- Expand logging sinks if needed (file / in-engine console).
-- Camera / view-projection helpers.
+Interfaces as frozen and built (one correction: glad 1 guards its extension
+block with the `GL_KHR_debug` macro — `GLAD_GL_KHR_debug` is the runtime int,
+so the compile-time probe uses the former):
 
-### Phase 3 — Scene / transforms
+- `core/GLDebug.h` + new `core/GLDebug.cpp`: `bool installGlDebugCallback();`
+  in `namespace jade`. When the context is 4.3+ or exposes `GLAD_GL_KHR_debug`:
+  enable `GL_DEBUG_OUTPUT` + `GL_DEBUG_OUTPUT_SYNCHRONOUS`, register a callback
+  mapping severity HIGH → `JADE_LOG_ERROR`, MEDIUM/LOW → `JADE_LOG_WARN`,
+  dropping NOTIFICATION spam; return whether installed. `GL_CHECK` stays as the
+  3.3-path fallback. Wired in `Window`'s constructor right after glad loads,
+  logging which mode is active. Callback bodies get exception barriers (same
+  rule as the resize callback).
+- New `renderer/Camera.h/.cpp`: pure math, no Input, no GL (glm headers in the
+  `.cpp` only, `math/MathTypes.h` in the header). Yaw/pitch in radians around
+  a Y-up world; yaw 0 / pitch 0 faces −Z, positive yaw turns toward +X:
+  `forward = {cos(pitch)·sin(yaw), sin(pitch), −cos(pitch)·cos(yaw)}`.
+  API: `view()`, `projection()`, `viewProjection()` (Mat4), `forward()` (Vec3),
+  `position()`/`setPosition(Vec3)`, `yaw()`/`setYaw(float)`,
+  `pitch()`/`setPitch(float)`, `setAspect(float)`,
+  `setPerspective(float fovYRadians, float nearPlane, float farPlane)`.
+  Defaults: position {0,0,2}, yaw/pitch 0, fovY 60°, aspect 16:9, near 0.1,
+  far 100 (`k`-prefixed constants). Unit tests in `tests/CameraTests.cpp`.
+- `Renderer::setViewProjection(const Mat4&)` cached on the Renderer; `draw()`
+  uploads it as `uViewProj`. Wired by the coordinator with the demo shader.
+- `core/Logger.h/.cpp`: `Logger::setFileSink(const std::string& path)` —
+  mirror every record into one `std::ofstream` guarded by the existing mutex;
+  empty path closes the sink; open failure logs an error and leaves the sink
+  closed. Stretch — may slip to Phase 6 without blocking Phase 2 exit.
 
-- Entity or node transform hierarchy.
-- Basic scene graph or flat entity list — pick one style and stay consistent.
+Decisions: KHR_debug is push-based and replaces poll-only `GL_CHECK` on 4.3+
+contexts (llvmpipe's 4.5 in CI exercises it); pitch clamping is the Phase 5
+controller's job — Camera stores what it is given.
 
-### Phase 4 — Assets
+### Phase 3 — Scene / transforms (DONE)
 
-- Mesh/texture/shader loading from disk.
-- Hot-reload optional; do not block Phase 4 on it.
+**Decision: flat entity list, no hierarchy.** The demo end state (camera over
+a handful of meshes) never needs parenting; `Transform::matrix()` keeps the
+seam open — parenting later is matrix multiplication, not a rewrite.
 
-### Phase 5 — Gameplay loop
+Frozen interfaces:
 
-- Systems that consume the fixed timestep (physics-lite, controllers).
-- Keep render on the variable frame; simulate on the fixed step.
+- `math/Transform.h` + `.cpp` (implementation in the .cpp so glm/gtc stays out
+  of includers, per standards rule 14): `struct Transform { Vec3 position{0};
+  Vec3 rotationEuler{0}; Vec3 scale{1}; Mat4 matrix() const; }` — radians;
+  compose T · Ry(y) · Rx(x) · Rz(z) · S (yaw-pitch-roll order). Euler chosen
+  over quaternions deliberately at demo scale; documented upgrade note.
+- `scene/Entity.h`: `struct Entity { std::string name; Transform transform;
+  const Mesh* mesh{nullptr}; const Texture* texture{nullptr}; }` — mesh and
+  texture are **non-owning**; ownership stays with the creator (main now,
+  asset loaders in Phase 4). That is the scene ownership rule; state it in
+  the header comment.
+- `scene/Scene.h/.cpp`: `using EntityId = std::size_t;` (index into the list).
+  `class Scene { Entity& createEntity(std::string name);
+  std::vector<Entity>& entities(); const std::vector<Entity>& entities() const;
+  }` — returned `Entity&` invalidates on the next `createEntity` (vector
+  reallocation); hold `EntityId`, not references. No removal in Phase 3
+  (`TODO(jade)` for removal + generation ids when gameplay needs them).
+- `Renderer::draw(const Mesh&, const Shader&, const Texture&, const Mat4&
+  model)` uploads `uModel`; existing overloads forward identity. Demo shaders
+  become `uViewProj * uModel * vec4(aPosition, 1.0)`.
+- `tests/TransformTests.cpp`: identity, pure translate, TRS ordering (a known
+  point through a known transform), scale, rotation order sanity.
 
-### Phase 6 — Tooling / editor hooks
+### Phase 4 — Assets (DONE)
 
-- Multi-window support (Window already refcounts GLFW for this).
-- Debug draw / gizmos.
+Decisions: images via **stb** (vcpkg port `stb`), meshes via **tinyobjloader**
+(OBJ only — enough for demo props), shaders as plain text files. Loaders throw
+`AssetError`; ownership transfers via `std::unique_ptr` (the GL types are
+non-movable; rule 4 allows smart pointers for ownership transfer). Hot reload
+explicitly skipped per the original plan.
 
-### Phase 7 — Polish + packaging
+Prerequisite (serialized, lands first): `Vertex` gains a normal — layout
+0=position, 1=normal, 2=color, 3=texCoord; `Mesh` attribute setup updated;
+demo shader gains a Lambert term (`uLightDir` = unit vector from surface
+toward the light, wrapped `max(dot(n,l),0)` over a 0.15 ambient floor;
+normals transformed by `mat3(transpose(inverse(uModel)))`);
+`Renderer::setLightDirection(const Vec3&)` cached and uploaded per draw.
 
-- Release build config, asset packaging, README for end users.
-- Performance passes only with a profiler, not guesswork.
+Frozen interfaces:
+
+- `assets/AssetError.h`: `class AssetError : public std::runtime_error`
+  (pattern of `WindowError`); `main` adds it to the specific catch list.
+- `assets/AssetPaths.h/.cpp`: `std::filesystem::path assetRoot();` —
+  `JADE_ASSET_ROOT` env override wins; else `assets/` next to the executable
+  (platform query behind `#if defined(_WIN32)` etc.; falls back to the
+  working directory with a logged WARN if the query fails). Resolved once,
+  logged once.
+- `assets/TextureLoader.h/.cpp`:
+  `std::unique_ptr<Texture> loadTexture(const std::filesystem::path& relative);`
+  — stb_image, vertical flip on, force 4 channels, `AssetError` with the full
+  path on failure. Exactly one TU defines `STB_IMAGE_IMPLEMENTATION`.
+- `assets/MeshLoader.h/.cpp`:
+  `std::unique_ptr<Mesh> loadMeshObj(const std::filesystem::path& relative);`
+  — tinyobjloader, triangulate on, de-index into
+  `Vertex{pos, normal, color=white, uv}`, flat normals generated when the OBJ
+  has none, `AssetError` on parse failure.
+- `assets/ShaderLoader.h/.cpp`:
+  `std::unique_ptr<Shader> loadShader(const std::filesystem::path& vertRel,
+  const std::filesystem::path& fragRel);` — read files to strings (missing
+  file → `AssetError`), delegate to the existing from-memory `Shader` ctor so
+  `ShaderError` semantics stay untouched.
+- Content: `assets/shaders/basic.vert/.frag` (the embedded demo GLSL moves out
+  of `main.cpp`), `assets/textures/checker.png` (small, committed),
+  `assets/meshes/cube.obj` + `plane.obj` (hand-authored, text-reviewable).
+- CMake: post-build `copy_directory` assets → `$<TARGET_FILE_DIR:jade>/assets`;
+  manifest gains `stb` + `tinyobjloader` (the one planned CI cache
+  invalidation); the local dev loop resolves both from system packages.
+
+### Phase 5 — Gameplay loop (DONE)
+
+**Decision: snapshot + blend interpolation.** Fixed-step simulation with
+variable-rate rendering stutters without blending; each render frame draws
+`interpolate(previous, current, Timer::alpha())`. **No System base class** —
+a registry of virtual systems is mini-ECS creep; two concrete classes are
+called explicitly from the drain loop.
+
+Frozen interfaces:
+
+- `Timer`: `float alpha() const` — `m_accumulator / kFixedDelta`, the [0,1)
+  fraction of the next fixed step already elapsed; meaningful after the drain.
+- `math/Transform.h/.cpp`: free function
+  `Mat4 interpolate(const Transform& from, const Transform& to, float alpha)`
+  — lerp position/scale; per-component shortest-path angle lerp (wrap to
+  [-pi, pi]) on the Euler angles; compose like `Transform::matrix()`.
+  Documented limitation: per-component Euler blending, fine at demo rates.
+- `scene/Entity.h`: gains `Transform previousTransform;` (coordinator).
+  `Scene::snapshotPrevious()` copies current→previous for every entity;
+  called once per CONSUMED fixed step, inside the drain, before the systems
+  run. (Corrected after the phase review: the original per-render-frame
+  placement collapsed previous onto current on zero-step frames, reducing
+  interpolation to a 60 Hz stair-step at high refresh rates.)
+- `core/Input`: `MousePosition mouseDelta() const` — pixels moved since the
+  previous `update()`; zero on the first frame. `Key::F1 = 290` added.
+- `game/CameraController.h/.cpp`: owns the authoritative fly pose
+  (position/yaw/pitch + previous copies, seeded from the Camera at
+  construction). `explicit CameraController(Camera& camera);`
+  `void collectLook(const Input&);` (once per render frame after
+  Input::update() — banks the frame's look delta so zero-step frames cannot
+  drop it); `void snapshotPrevious();` (per consumed step, with the scene's);
+  `void fixedUpdate(const Input& input, float dt);` — WASD planar relative to
+  yaw, Space up / LeftShift down (`kMoveSpeed` 2.5 u/s); look while the right
+  mouse button is held via `mouseDelta()` (`kLookSpeed` 0.0035 rad/px), pitch
+  clamped to ±89° (the clamp lives HERE, per the Phase 2 freeze);
+  `void writeToCamera(float alpha) const;` — sets the stored Camera& to the
+  interpolated pose (position lerp, shortest-path yaw/pitch lerp).
+- `game/Spinner.h/.cpp`: `explicit Spinner(float radiansPerSecond);`
+  `void add(EntityId id);` `void fixedUpdate(Scene& scene, float dt);` —
+  advances `rotationEuler.y` of registered entities. Exists to make the
+  fixed-step + interpolation pipeline visibly smooth.
+- Tests: `interpolate` (alpha 0/1/0.5, wrap across ±pi picks the short arc),
+  `Timer::alpha` bounds (0 after full drain, <1 always, grows with advance).
+- main drain becomes:
+  `scene.snapshotPrevious(); controller.snapshotPrevious();
+   while (timer.consumeFixedStep()) { controller.fixedUpdate(input, timer.fixedDelta());
+   spinner.fixedUpdate(scene, timer.fixedDelta()); }` and the render pass
+  draws `interpolate(e.previousTransform, e.transform, timer.alpha())` with
+  `controller.writeToCamera(timer.alpha())` before `setViewProjection`.
+
+### Phase 6 — Tooling / editor hooks (DONE)
+
+Frozen interfaces:
+
+- NEW `renderer/DebugDraw.h/.cpp`: immediate-mode line batcher.
+  `class DebugDraw` — ctor creates its own VAO/VBO and compiles a minimal
+  embedded position+color line shader (embedded is CORRECT here: it is
+  engine-internal tooling, not content); non-copyable/non-movable.
+  `void line(const Vec3& a, const Vec3& b, const Vec3& color);`
+  `void grid(float extent, float step, const Vec3& color);` — XZ plane at
+  y = 0, lines every `step` from -extent to +extent in both axes.
+  `void axes(const Transform& t, float length);` — the transform's local
+  X/Y/Z as red/green/blue segments from its position.
+  `void flush(const Mat4& viewProj);` — uploads the batch
+  (`GL_DYNAMIC_DRAW`, orphaned by respecifying per flush), draws GL_LINES,
+  clears the batch. Every GL call in GL_CHECK. Vertex layout private to the
+  batcher (location 0 = position, 1 = color).
+- `Window` gains `void makeCurrent() const;` — the constructor documents
+  that it leaves the NEW window's context current; the second-window proof
+  needs to restore the primary context afterwards (coordinator).
+- Demo: `Key::F1` toggles debug draw (grid extent 3.0 step 0.5 + per-entity
+  axes, flushed after the lit pass with the same view-projection).
+- Second-window proof (coordinator, `main.cpp`): `JADE_SECOND_WINDOW=1`
+  constructs a second `Window`, logs its negotiated context, destroys it
+  before the loop, then restores the primary context via `makeCurrent()` —
+  exercising the GLFW refcount and the context save/restore hygiene fixes.
+  Explicitly NOT an editor shell.
+- Log file sink already landed in Phase 2 (did not slip).
+
+### Phase 7 — Polish + packaging (DONE)
+
+- `project(... VERSION 0.1.0)`; `JADE_VERSION` compile definition feeds the
+  startup log from the single authoritative version.
+- CPack: flat package (binary at root + content-only `assets/` beside it —
+  the exact exe-relative layout), ZIP on Windows / TGZ elsewhere; CI runs
+  cpack per leg and uploads `jade-<os>` artifacts on every green run.
+- README rewritten for demo users first (controls, download-and-run), then
+  build-from-source, third-party notices incl. stb/tinyobjloader/doctest.
+- Performance note (honest, per the original rule): not profiled; no known
+  hotspots at demo scale. Perf passes only with a profiler, not guesswork.
 
 Phases 2–7 are intentionally thinner than Phase 1. Expand a phase's section in
 this file when that phase becomes current — do not invent APIs ahead of time.
@@ -164,12 +337,16 @@ this file when that phase becomes current — do not invent APIs ahead of time.
 
 ## Known nits (carry forward)
 
-From `docs/VERIFICATION_2026-08-19.md`, still open:
-
-1. Prefer `// TODO(jade):` tags on temporary stubs so open work is greppable.
+None open.
 
 Addressed 2026-08-22: GLFW refcount is mutex-protected and incremented only
-after successful `glfwInit`. `requestClose()` is no longer `const`.
+after successful `glfwInit`. `requestClose()` is no longer `const`. The
+`// TODO(jade):` tag format is in active use (grep confirms) — the 2026-08-19
+nit about it is resolved. A later hygiene pass added: 4.1 fallback rung,
+context save/restore + exception barriers in GLFW callbacks, sticky input +
+auto-tracked edge queries, Shader uniform location cache with warn-once and
+bind-before-set, Logger stdout flush on errors, `GLFW_INCLUDE_NONE`, and a
+catch-all in `main`.
 
 ---
 
@@ -178,6 +355,7 @@ after successful `glfwInit`. `requestClose()` is no longer `const`.
 **DONE.** CMake/vcpkg, Window, Logger, GLDebug, and the main loop with
 `"Jade Engine initialized"` are landed and verified.
 
-**Next Cursor instruction that stays on rails:** Phase 1 is closed. Do not start
-Phase 2 (KHR_debug, camera helpers, extra log sinks) unless the user explicitly
-asks.
+**Next instruction that stays on rails:** all seven phases are closed —
+M-final is met (see docs/VERIFICATION_2026-08-22-final.md). New work means a
+new roadmap section agreed with the user first; do not reopen closed phases
+except to fix verified defects.

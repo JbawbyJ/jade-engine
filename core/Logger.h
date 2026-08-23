@@ -25,6 +25,12 @@ public:
                     int line,
                     std::string_view message);
 
+    /// Mirror every record (all levels) into a file at `path`, in addition to
+    /// the console streams. The file is opened truncating — each call starts a
+    /// fresh session log. An empty path closes the sink. If the file cannot be
+    /// opened, the sink stays closed and the failure is logged as an error.
+    static void setFileSink(const std::string& path);
+
 private:
     static const char* levelToString(LogLevel level);
     static std::string timestamp();

@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
 #include "math/MathTypes.h"
 
@@ -32,6 +33,10 @@ public:
     void bind() const;
     void unbind() const;
 
+    // Setters bind this program first — glUniform* writes to whichever
+    // program is currently in use, so setting without binding would silently
+    // target someone else's shader. A missing / optimized-out uniform name
+    // no-ops and warns once.
     void setInt(const char* name, int value) const;
     void setFloat(const char* name, float value) const;
     void setVec2(const char* name, const Vec2& value) const;
@@ -45,6 +50,11 @@ private:
     int uniformLocation(const char* name) const;
 
     unsigned int m_id{0};
+
+    // Location cache: mutable because caching in a const setter is a lookup
+    // optimization, not logical state. Misses (-1) are cached too, so the
+    // warn-once fires exactly once per bad name.
+    mutable std::unordered_map<std::string, int> m_uniformLocations;
 };
 
 } // namespace jade

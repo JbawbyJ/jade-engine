@@ -132,12 +132,26 @@ void Shader::unbind() const {
 }
 
 int Shader::uniformLocation(const char* name) const {
+    // Cached: glGetUniformLocation is a driver-side string lookup, and draw
+    // paths hit setters every frame. Misses are cached as -1 with one warning
+    // so a typo'd or optimized-out name is loud exactly once, not silent.
+    const auto found = m_uniformLocations.find(name);
+    if (found != m_uniformLocations.end()) {
+        return found->second;
+    }
+
     int location = -1;
     GL_CHECK(location = glGetUniformLocation(m_id, name));
+    m_uniformLocations.emplace(name, location);
+    if (location < 0) {
+        JADE_LOG_WARN(std::string("Uniform '") + name
+                      + "' not active (unused/optimized out, or misspelled)");
+    }
     return location;
 }
 
 void Shader::setInt(const char* name, int value) const {
+    bind();
     const int location = uniformLocation(name);
     if (location < 0) {
         return;
@@ -146,6 +160,7 @@ void Shader::setInt(const char* name, int value) const {
 }
 
 void Shader::setFloat(const char* name, float value) const {
+    bind();
     const int location = uniformLocation(name);
     if (location < 0) {
         return;
@@ -154,6 +169,7 @@ void Shader::setFloat(const char* name, float value) const {
 }
 
 void Shader::setVec2(const char* name, const Vec2& value) const {
+    bind();
     const int location = uniformLocation(name);
     if (location < 0) {
         return;
@@ -162,6 +178,7 @@ void Shader::setVec2(const char* name, const Vec2& value) const {
 }
 
 void Shader::setVec3(const char* name, const Vec3& value) const {
+    bind();
     const int location = uniformLocation(name);
     if (location < 0) {
         return;
@@ -170,6 +187,7 @@ void Shader::setVec3(const char* name, const Vec3& value) const {
 }
 
 void Shader::setVec4(const char* name, const Vec4& value) const {
+    bind();
     const int location = uniformLocation(name);
     if (location < 0) {
         return;
@@ -178,6 +196,7 @@ void Shader::setVec4(const char* name, const Vec4& value) const {
 }
 
 void Shader::setMat4(const char* name, const Mat4& value) const {
+    bind();
     const int location = uniformLocation(name);
     if (location < 0) {
         return;

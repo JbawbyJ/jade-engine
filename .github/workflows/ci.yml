@@ -9,6 +9,9 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  VCPKG_SHA: 127402f1c75bb3d5ff6bce04b285faa4930a5aca
+
 jobs:
   smoke:
     name: smoke (${{ matrix.name }})
@@ -21,6 +24,8 @@ jobs:
             os: ubuntu-latest
           - name: windows
             os: windows-latest
+          - name: macos
+            os: macos-latest
 
     steps:
       - name: Checkout
@@ -39,20 +44,27 @@ jobs:
             automake \
             libtool \
             libgl1-mesa-dev \
+            libgl1-mesa-dri \
             libx11-dev \
             libxrandr-dev \
             libxinerama-dev \
             libxcursor-dev \
-            libxi-dev
+            libxi-dev \
+            xvfb
 
       - name: Cache vcpkg binary packages
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.vcpkg-cache
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'overlays/glad/portfile.cmake') }}
+          key: vcpkg-${{ runner.os }}-${{ env.VCPKG_SHA }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'overlays/**') }}
+          restore-keys: vcpkg-${{ runner.os }}-${{ env.VCPKG_SHA }}-
 
       - name: Clone vcpkg
-        run: git clone --depth 1 https://github.com/microsoft/vcpkg.git ${{ github.workspace }}/.vcpkg
+        shell: bash
+        run: |
+          git init "$GITHUB_WORKSPACE/.vcpkg"
+          git -C "$GITHUB_WORKSPACE/.vcpkg" fetch --depth 1 https://github.com/microsoft/vcpkg.git "$VCPKG_SHA"
+          git -C "$GITHUB_WORKSPACE/.vcpkg" checkout FETCH_HEAD
 
       - name: Bootstrap vcpkg
         shell: bash
@@ -75,11 +87,60 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
             -DCMAKE_TOOLCHAIN_FILE="${GITHUB_WORKSPACE}/.vcpkg/scripts/buildsystems/vcpkg.cmake"
             -DVCPKG_OVERLAY_PORTS="${GITHUB_WORKSPACE}/overlays"
+            -DJADE_BUILD_TESTS=ON
           )
           if [ "${{ runner.os }}" = "Linux" ]; then
             cmake_args+=(-G Ninja)
           fi
+          cmake_args+=(-DJADE_WERROR=ON)
           cmake "${cmake_args[@]}"
 
       - name: Build
         run: cmake --build build --config Release
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -C Release
+
+      - name: Package
+        shell: bash
+        run: cd build && cpack -C Release
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: jade-${{ matrix.name }}
+          path: |
+            build/jade-engine-*.zip
+            build/jade-engine-*.tar.gz
+          if-no-files-found: error
+
+      - name: Headless run gate
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -o pipefail
+          LIBGL_ALWAYS_SOFTWARE=1 JADE_MAX_FRAMES=120 JADE_SECOND_WINDOW=1 \
+            xvfb-run -a -s "-screen 0 1280x720x24" ./build/bin/jade 2>&1 | tee run.log
+          if ! grep -q "Jade Engine initialized" run.log; then
+            echo "Headless run gate FAILED: 'Jade Engine initialized' not found in run.log"
+            exit 1
+          fi
+          if ! grep -q "Jade Engine shutdown" run.log; then
+            echo "Headless run gate FAILED: 'Jade Engine shutdown' not found in run.log"
+            exit 1
+          fi
+          if grep -v "GLFW error 65543" run.log | grep -E "GL_INVALID|GL_OUT_OF|\[ERROR\]"; then
+            echo "Headless run gate FAILED: GL error or [ERROR] line found in run.log (expected fallback 'GLFW error 65543' excluded)"
+            exit 1
+          fi
+          echo "Headless run gate passed"
+
+      - name: Package smoke (unpack + run)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/jade-pkg && tar xzf build/jade-engine-*.tar.gz -C /tmp/jade-pkg --strip-components=1
+          LIBGL_ALWAYS_SOFTWARE=1 JADE_MAX_FRAMES=60 \
+            xvfb-run -a -s "-screen 0 1280x720x24" /tmp/jade-pkg/jade 2>&1 | tee pkg.log
+          grep -q "Jade Engine shutdown" pkg.log || { echo "Package smoke FAILED"; exit 1; }

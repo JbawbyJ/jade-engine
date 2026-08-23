@@ -16,20 +16,32 @@ namespace jade {
 namespace {
     // Reference-counted GLFW init. We support multiple Window instances even
     // though Phase 1 only creates one, because tools/editors will need it.
-    // The mutex guards the count so a second thread cannot interleave
-    // init/terminate; increment happens only after glfwInit succeeds.
+    // The mutex only keeps the count itself coherent; it is NOT a license to
+    // construct Windows off the main thread — GLFW requires glfwInit,
+    // glfwTerminate, and glfwCreateWindow to run on the main thread.
+    // Increment happens only after glfwInit succeeds.
     std::mutex s_glfwMutex;
     int        s_glfwRefCount = 0;
 
+    // 4.1 sits between 4.3 and 3.3 because it is the macOS core-profile
+    // ceiling; without that rung macOS would silently fall through to 3.3.
     constexpr int kContextFallbacks[][2] = {
         {4, 6},
         {4, 5},
         {4, 3},
+        {4, 1},
         {3, 3},
     };
 
     void glfwErrorCallback(int code, const char* description) {
-        JADE_LOG_ERROR(std::string("GLFW error ") + std::to_string(code) + ": " + description);
+        // Exception barrier: this is called from GLFW's C frames, and a C++
+        // exception unwinding through them is undefined behavior. Logging
+        // allocates, so guard it; if even logging fails there is nothing
+        // safe left to do but swallow.
+        try {
+            JADE_LOG_ERROR(std::string("GLFW error ") + std::to_string(code) + ": " + description);
+        } catch (...) {
+        }
     }
 
     const char* glStringOrUnknown(GLenum name) {
@@ -129,6 +141,15 @@ Window::Window(const WindowProps& props)
                       + " | GPU: "
                       + glStringOrUnknown(GL_RENDERER));
 
+        // Push-based GL diagnostics (KHR_debug / core 4.3+): the driver calls
+        // us the moment it records a problem, like an event listener replacing
+        // a polling loop. GL_CHECK stays on every call as the 3.3-path fallback.
+        if (installGlDebugCallback()) {
+            JADE_LOG_INFO("KHR_debug active: push-based GL diagnostics");
+        } else {
+            JADE_LOG_INFO("KHR_debug unavailable: GL_CHECK polling only");
+        }
+
         // Hi-DPI (e.g. Retina) decouples window size from framebuffer size.
         glfwGetWindowSize(m_window, &m_width, &m_height);
         glfwGetFramebufferSize(m_window, &m_framebufferWidth, &m_framebufferHeight);
@@ -169,6 +190,10 @@ void Window::requestClose() {
     glfwSetWindowShouldClose(m_window, GLFW_TRUE);
 }
 
+void Window::makeCurrent() const {
+    glfwMakeContextCurrent(m_window);
+}
+
 void Window::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
     // Recover our Window* from the user pointer set in the constructor.
     auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
@@ -177,10 +202,33 @@ void Window::framebufferSizeCallback(GLFWwindow* window, int width, int height) 
     self->m_framebufferWidth  = width;
     self->m_framebufferHeight = height;
 
-    // Multi-window: this callback can fire while another context is current.
+    // Multi-window: this callback can fire while another context is current,
+    // so switch, update the viewport, and restore what was current before —
+    // hijacking the caller's context would be a silent state change.
+    GLFWwindow* previous = glfwGetCurrentContext();
     glfwMakeContextCurrent(window);
     GL_CHECK(glViewport(0, 0, width, height));
-    if (self->m_onResize) self->m_onResize(width, height);
+
+    // Exception barrier: user callbacks must not unwind GLFW's C frames (UB).
+    // The handlers' own log lines allocate, so they get a swallowing guard
+    // too — under memory pressure even reporting the failure can throw.
+    try {
+        if (self->m_onResize) self->m_onResize(width, height);
+    } catch (const std::exception& error) {
+        try {
+            JADE_LOG_ERROR(std::string("Resize callback threw: ") + error.what());
+        } catch (...) {
+        }
+    } catch (...) {
+        try {
+            JADE_LOG_ERROR("Resize callback threw a non-standard exception");
+        } catch (...) {
+        }
+    }
+
+    if (previous != window) {
+        glfwMakeContextCurrent(previous); // nullptr is legal: no context current
+    }
 }
 
 void Window::windowSizeCallback(GLFWwindow* window, int width, int height) {

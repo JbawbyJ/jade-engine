@@ -6,14 +6,25 @@
 // Usage:  GL_CHECK(glClear(GL_COLOR_BUFFER_BIT));
 //
 // This drains glGetError() after the call and logs each pending error with
-// the originating __FILE__/__LINE__. In Phase 2 we will swap this for
-// glDebugMessageCallback (KHR_debug) which is push-based and richer.
+// the originating __FILE__/__LINE__. On 4.3+ contexts (or with KHR_debug)
+// installGlDebugCallback() adds push-based driver diagnostics on top;
+// GL_CHECK stays on every call as the 3.3-path fallback.
 
 #include <glad/glad.h>
 
 #include "core/Logger.h"
 
 namespace jade {
+
+/// Install the KHR_debug / GL 4.3+ core message callback on the CURRENT
+/// context. Push-based: the driver calls us the instant it records a problem
+/// (like subscribing to an error event stream instead of polling a status
+/// endpoint the way GL_CHECK does). Severity mapping: HIGH -> JADE_LOG_ERROR,
+/// MEDIUM/LOW -> JADE_LOG_WARN, NOTIFICATION -> dropped (spam filter).
+/// Returns true only when the callback is actually installed; false on
+/// contexts without debug output (e.g. the 3.3/4.1 fallback rungs), where
+/// GL_CHECK polling remains the only diagnostic. Call after glad has loaded.
+bool installGlDebugCallback();
 
 inline void glCheckError(const char* file, int line) {
     GLenum err;
