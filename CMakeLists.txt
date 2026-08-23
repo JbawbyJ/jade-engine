@@ -94,6 +94,14 @@ target_compile_definitions(jade PRIVATE
     GLFW_INCLUDE_NONE
     JADE_VERSION="${PROJECT_VERSION}")
 
+if(MSVC)
+    # main.cpp reads env vars through standard std::getenv (read-only, at
+    # startup, single-threaded); MSVC's C4996 "unsafe, use _dupenv_s" advisory
+    # would be fatal under /WX, so opt out of that one advisory rather than
+    # fork the code per platform.
+    target_compile_definitions(jade PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+
 target_include_directories(jade SYSTEM PRIVATE ${Stb_INCLUDE_DIR})
 
 target_link_libraries(jade PRIVATE
