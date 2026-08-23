@@ -92,11 +92,7 @@ jobs:
           if [ "${{ runner.os }}" = "Linux" ]; then
             cmake_args+=(-G Ninja)
           fi
-          if [ "${{ runner.os }}" = "macOS" ]; then
-            cmake_args+=(-DJADE_WERROR=OFF)
-          else
-            cmake_args+=(-DJADE_WERROR=ON)
-          fi
+          cmake_args+=(-DJADE_WERROR=ON)
           cmake "${cmake_args[@]}"
 
       - name: Build

@@ -157,8 +157,8 @@ include(CPack)
 # Shared via an interface target so every engine target (jade, jade_tests)
 # compiles under the identical flag set.
 # JADE_WERROR stays OFF for local dev (a newer local compiler's novel warning
-# must not brick the loop); CI configures with -DJADE_WERROR=ON as the gate
-# (the macOS leg joins at ON after its first green warning-survey run).
+# must not brick the loop); every CI leg configures with -DJADE_WERROR=ON as
+# the gate (macOS joined after a clean AppleClang warning-survey run).
 option(JADE_WERROR "Treat compiler warnings as errors" OFF)
 
 add_library(jade_warnings INTERFACE)
