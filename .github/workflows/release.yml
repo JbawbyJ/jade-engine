@@ -9,6 +9,14 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Manual dispatch covers environments whose git proxy cannot push tag refs:
+  # the release job passes tag_name to action-gh-release, which creates the
+  # tag at this run's commit when it does not exist yet.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to create and release (e.g. v0.1.0)"
+        required: true
 
 permissions:
   contents: write
@@ -131,7 +139,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Jade Engine ${{ github.ref_name }}
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: Jade Engine ${{ github.event.inputs.tag || github.ref_name }}
           files: dist/*
           body: |
             A small original C++17 / OpenGL engine shipping a playable demo
