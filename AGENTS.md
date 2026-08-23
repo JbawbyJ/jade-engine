@@ -1,11 +1,15 @@
 # Jade Engine
 
-Custom C++17 game engine (Phase 1). It opens a GLFW window, creates an OpenGL
-core-profile context (prefers 4.6, falls back to 4.5 / 4.3 / 4.1 / 3.3), and
-draws a colored triangle every frame until you press ESC or close the window.
-Dependencies (`glfw3`, `glad`, `glm`, `doctest` for tests) are managed with
-vcpkg and wired in through CMake. `glad` is generated for GL 4.6 **core** via `gl-api-46` plus the
-`overlays/glad` port (`GLAD_PROFILE=core`).
+Custom C++17 game engine. The frozen M1 foundation renders a fly-camera demo
+scene — Lambert-lit, checker-textured ground with spinning cubes, all assets
+loaded from disk — on a fixed timestep with interpolated rendering, in an
+OpenGL core-profile context (prefers 4.6, falls back to 4.5 / 4.3 / 4.1 /
+3.3). **`CLAUDE.md` at the repo root is the authoritative project brief
+(mission, roadmap, rules); trust it over this file on any conflict.**
+Dependencies (`glfw3`, `glad`, `glm`, `stb`, `tinyobjloader`, `doctest` for
+tests) are managed with vcpkg and wired in through CMake. `glad` is generated
+for GL 4.6 **core** via `gl-api-46` plus the `overlays/glad` port
+(`GLAD_PROFILE=core`).
 
 ## Cursor Cloud specific instructions
 
@@ -33,7 +37,10 @@ the non-obvious things to know when developing here.
 
 ### Test
 
-- There is no automated test suite in this repo yet. Verify changes by building and running.
+- GL-free doctest suite (timer, math, transforms, camera) builds by default
+  (`JADE_BUILD_TESTS=ON`); run it with `ctest --test-dir build
+  --output-on-failure`. CI runs it on every leg. Verify rendering-side
+  changes by building and running.
 
 ### Run (headless caveat — important)
 
@@ -53,8 +60,9 @@ LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=4.6 MESA_GLSL_VERSION_OVERRIDE=
   xvfb-run -a -s "-screen 0 1280x720x24" ./build/bin/jade
 ```
 
-- The render loop runs until ESC/window-close; headless there is no input, so wrap it in
-  `timeout <seconds>` when you just want to confirm startup.
+- The render loop runs until ESC/window-close; headless there is no input, so
+  set `JADE_MAX_FRAMES=N` for a clean deterministic exit after N frames (the
+  CI gate relies on it — a `timeout`-killed process never logs shutdown).
 - Startup logs (`OpenGL ... | GPU: ...` and `Jade Engine initialized`) go to `std::cout`,
   which is fully buffered when redirected to a file. If you redirect to a log file and kill
   the process, prefix with `stdbuf -oL -eL` or the buffer will never flush and the log looks
