@@ -1,0 +1,156 @@
+name: Release
+
+# Tag-driven releases: `git tag vX.Y.Z && git push origin vX.Y.Z` builds the
+# demo package on every platform and publishes one GitHub Release with all
+# assets attached. Build steps mirror ci.yml (same pinned vcpkg + cache key,
+# so warm CI caches are reused); the matrix uploads artifacts and one final
+# job aggregates them into the release, avoiding create-release races.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  VCPKG_SHA: 127402f1c75bb3d5ff6bce04b285faa4930a5aca
+
+jobs:
+  package:
+    name: package (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu
+            os: ubuntu-latest
+          - name: windows
+            os: windows-latest
+          - name: macos
+            os: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Ubuntu packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build \
+            pkg-config \
+            python3 \
+            autoconf \
+            autoconf-archive \
+            automake \
+            libtool \
+            libgl1-mesa-dev \
+            libgl1-mesa-dri \
+            libx11-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxi-dev
+
+      - name: Cache vcpkg binary packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.vcpkg-cache
+          key: vcpkg-${{ runner.os }}-${{ env.VCPKG_SHA }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'overlays/**') }}
+          restore-keys: vcpkg-${{ runner.os }}-${{ env.VCPKG_SHA }}-
+
+      - name: Clone vcpkg
+        shell: bash
+        run: |
+          git init "$GITHUB_WORKSPACE/.vcpkg"
+          git -C "$GITHUB_WORKSPACE/.vcpkg" fetch --depth 1 https://github.com/microsoft/vcpkg.git "$VCPKG_SHA"
+          git -C "$GITHUB_WORKSPACE/.vcpkg" checkout FETCH_HEAD
+
+      - name: Bootstrap vcpkg
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            "${GITHUB_WORKSPACE}/.vcpkg/bootstrap-vcpkg.bat" -disableMetrics
+          else
+            "${GITHUB_WORKSPACE}/.vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+
+      - name: Configure
+        shell: bash
+        env:
+          VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache
+        run: |
+          mkdir -p "${VCPKG_DEFAULT_BINARY_CACHE}"
+          cmake_args=(
+            -S .
+            -B build
+            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_TOOLCHAIN_FILE="${GITHUB_WORKSPACE}/.vcpkg/scripts/buildsystems/vcpkg.cmake"
+            -DVCPKG_OVERLAY_PORTS="${GITHUB_WORKSPACE}/overlays"
+            -DJADE_BUILD_TESTS=ON
+            -DJADE_WERROR=ON
+          )
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            cmake_args+=(-G Ninja)
+          fi
+          cmake "${cmake_args[@]}"
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -C Release
+
+      - name: Package
+        shell: bash
+        run: cd build && cpack -C Release
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.name }}
+          path: |
+            build/jade-engine-*.zip
+            build/jade-engine-*.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: publish release
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect packages
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Jade Engine ${{ github.ref_name }}
+          files: dist/*
+          body: |
+            A small original C++17 / OpenGL engine shipping a playable demo
+            scene: a fly camera over a Lambert-lit, checker-textured ground
+            with spinning cubes — every shader, mesh, and texture loaded from
+            disk, fixed-timestep simulation with interpolated rendering.
+
+            **Run it:** download the package for your platform, unpack, and
+            run `jade` (`jade.exe` on Windows). Keep the `assets/` folder next
+            to the binary.
+
+            | Input | Action |
+            | --- | --- |
+            | `W` `A` `S` `D` | Move |
+            | `Space` / `Left Shift` | Up / down |
+            | Hold **Right Mouse** + drag | Look around |
+            | `F1` | Debug grid + axes overlay |
+            | `ESC` | Quit |
+
+            Requires an OpenGL 3.3-core capable driver (prefers 4.6, falls
+            back through 4.5 / 4.3 / 4.1 / 3.3). Verification record:
+            [`docs/VERIFICATION_2026-08-22-final.md`](https://github.com/JbawbyJ/jade-engine/blob/main/docs/VERIFICATION_2026-08-22-final.md).
